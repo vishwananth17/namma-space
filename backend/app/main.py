@@ -136,12 +136,19 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 4. Include Routers
 app.include_router(health_router)
 app.include_router(venues_router)
 app.include_router(pois_router)
 app.include_router(search_router)
 app.include_router(navigation_router)
+
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    """Redirect root to Swagger UI documentation."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
+
 
 
 # 5. Static file serving for venue models, maps, and textures
