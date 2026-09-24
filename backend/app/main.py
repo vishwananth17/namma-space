@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Shutting down {settings.APP_NAME}.")
 
 
+# Initialize SQLite schema and seed data for serverless/local execution
+init_db()
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
