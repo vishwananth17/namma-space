@@ -1,3 +1,5 @@
+import os
+import shutil
 from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,7 +23,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Cross-Origin Resource Sharing (CORS) for Naresh's frontend
-    # Allows localhost Vite (5173), Next.js (3000), Three.js dev servers
+    # Allows localhost Vite (5173), Next.js (3000), Three.js dev servers, and Vercel domains
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -29,7 +31,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
-        "*",  # Permissive during hackathon local dev
+        "*",  # Permissive during hackathon local dev and staging
     ]
 
     # File paths
@@ -45,13 +47,21 @@ class Settings(BaseSettings):
 
     @property
     def sqlite_db_path(self) -> Path:
+        if os.environ.get("VERCEL"):
+            # On Vercel serverless, root is read-only; copy persistent DB to /tmp
+            tmp_db = Path("/tmp/nammaspace.db")
+            if not tmp_db.exists():
+                src_db = self.DATA_DIR / "nammaspace.db"
+                if src_db.exists():
+                    shutil.copy2(src_db, tmp_db)
+            return tmp_db
         return self.DATA_DIR / "nammaspace.db"
 
     @property
     def effective_db_url(self) -> str:
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        # On Windows, sqlite:///C:\... needs 3 or 4 slashes; as_posix() standardizes to forward slashes
+        # On Windows or Linux/Vercel, format clean sqlite URL
         return f"sqlite:///{self.sqlite_db_path.as_posix()}"
 
 

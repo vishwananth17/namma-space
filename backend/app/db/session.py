@@ -5,7 +5,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from app.config import settings
 
 # Create parent data folder if needed
-settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 connect_args = {}
 if "sqlite" in settings.effective_db_url:
