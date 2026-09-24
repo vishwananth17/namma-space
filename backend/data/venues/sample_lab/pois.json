@@ -1,0 +1,74 @@
+[
+  {
+    "id": "workstation-alpha",
+    "name": "Workstation Alpha (GPU Cluster)",
+    "category": "workstation",
+    "description": "High-performance compute rig equipped with dual RTX 4090 GPUs for deep learning models.",
+    "position": { "x": -5.0, "y": 0.8, "z": -3.0 },
+    "tags": ["workstation", "gpu", "desktop", "cuda", "compute"],
+    "floor": 0
+  },
+  {
+    "id": "workstation-beta",
+    "name": "Workstation Beta (Data Science)",
+    "category": "workstation",
+    "description": "Ergonomic desk with dual 4K monitors and high-speed fiber uplink.",
+    "position": { "x": -5.0, "y": 0.8, "z": 3.0 },
+    "tags": ["workstation", "python", "monitor", "workbench"],
+    "floor": 0
+  },
+  {
+    "id": "robotics-arena",
+    "name": "Robotics Testing Arena",
+    "category": "lab_equipment",
+    "description": "Enclosed 4m x 4m netted zone for autonomous quadrotor flight and ground rover navigation trials.",
+    "position": { "x": 4.0, "y": 0.6, "z": 0.0 },
+    "tags": ["robotics", "drone", "rover", "arena", "safety_cage"],
+    "floor": 0
+  },
+  {
+    "id": "3d-printer-station",
+    "name": "Bambu Lab 3D Printing Hub",
+    "category": "lab_equipment",
+    "description": "Multi-material high-speed 3D printing station for rapid mechanical prototyping.",
+    "position": { "x": -8.0, "y": 0.9, "z": -5.0 },
+    "tags": ["3d_printer", "prototyping", "hardware", "bambu"],
+    "floor": 0
+  },
+  {
+    "id": "main-exit",
+    "name": "Main Entrance & Emergency Exit",
+    "category": "exit",
+    "description": "Primary double-door entrance with card reader access and emergency evacuation push bar.",
+    "position": { "x": 0.0, "y": 1.0, "z": 7.2 },
+    "tags": ["exit", "entrance", "door", "evacuation"],
+    "floor": 0
+  },
+  {
+    "id": "conference-pod",
+    "name": "Discussion & Conference Pod",
+    "category": "amenity",
+    "description": "Semi-enclosed huddle space with a smart presentation screen and whiteboards.",
+    "position": { "x": 6.5, "y": 0.8, "z": -5.0 },
+    "tags": ["meeting", "whiteboard", "chairs", "presentation"],
+    "floor": 0
+  },
+  {
+    "id": "first-aid-station",
+    "name": "Emergency First Aid & Eye Wash",
+    "category": "safety",
+    "description": "Wall-mounted ANSI certified first aid kit and sterile eye wash safety bottle.",
+    "position": { "x": -9.0, "y": 1.4, "z": 6.0 },
+    "tags": ["safety", "medical", "first_aid", "emergency"],
+    "floor": 0
+  },
+  {
+    "id": "coffee-station",
+    "name": "Refreshment & Coffee Corner",
+    "category": "amenity",
+    "description": "Espresso machine, hot water dispenser, and organic tea collection.",
+    "position": { "x": 8.5, "y": 0.9, "z": 5.5 },
+    "tags": ["coffee", "water", "break", "pantry"],
+    "floor": 0
+  }
+]

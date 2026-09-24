@@ -1,1 +1,21 @@
+# Python virtual environments & bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
 
+# Databases & local caches
+*.db
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.coverage
+
+# Environment & OS files
+.env
+.env.local
+desktop.ini
+.DS_Store
+
+# Logs
+*.log

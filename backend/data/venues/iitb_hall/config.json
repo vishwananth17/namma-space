@@ -1,0 +1,41 @@
+{
+  "id": "iitb_hall",
+  "name": "IIT Bombay Convocation Hall",
+  "description": "Digitized 3D twin of IIT Bombay Convocation Hall (IIT Bombay).",
+  "model_file": "models/sample_room.glb",
+  "model_format": "glb",
+  "units": "meters",
+  "up_axis": "Y",
+  "floor_height": -0.1,
+  "bounds": {
+    "min": {
+      "x": -10.1,
+      "y": -0.1,
+      "z": -7.6
+    },
+    "max": {
+      "x": 10.1,
+      "y": 3.0,
+      "z": 7.6
+    }
+  },
+  "spawn_point": {
+    "position": {
+      "x": 0.0,
+      "y": 1.5,
+      "z": 2.0
+    },
+    "target": {
+      "x": 0.0,
+      "y": 0.9,
+      "z": -1.0
+    },
+    "yaw": 0.0,
+    "pitch": 0.0
+  },
+  "custom": {
+    "grid_resolution": 0.15,
+    "agent_radius": 0.3,
+    "onboarded_at": "2026-09-24"
+  }
+}

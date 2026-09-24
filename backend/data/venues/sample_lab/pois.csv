@@ -1,0 +1,9 @@
+id,name,category,description,x,y,z,tags,floor
+workstation-alpha,"Workstation Alpha (GPU Cluster)",workstation,"High-performance compute rig equipped with dual RTX 4090 GPUs for deep learning models.",-5.0,0.8,-3.0,"workstation,gpu,desktop,cuda,compute",0
+workstation-beta,"Workstation Beta (Data Science)",workstation,"Ergonomic desk with dual 4K monitors and high-speed fiber uplink.",-5.0,0.8,3.0,"workstation,python,monitor,workbench",0
+robotics-arena,"Robotics Testing Arena",lab_equipment,"Enclosed 4m x 4m netted zone for autonomous quadrotor flight and ground rover navigation trials.",4.0,0.6,0.0,"robotics,drone,rover,arena,safety_cage",0
+3d-printer-station,"Bambu Lab 3D Printing Hub",lab_equipment,"Multi-material high-speed 3D printing station for rapid mechanical prototyping.",-8.0,0.9,-5.0,"3d_printer,prototyping,hardware,bambu",0
+main-exit,"Main Entrance & Emergency Exit",exit,"Primary double-door entrance with card reader access and emergency evacuation push bar.",0.0,1.0,7.2,"exit,entrance,door,evacuation",0
+conference-pod,"Discussion & Conference Pod",amenity,"Semi-enclosed huddle space with a smart presentation screen and whiteboards.",6.5,0.8,-5.0,"meeting,whiteboard,chairs,presentation",0
+first-aid-station,"Emergency First Aid & Eye Wash",safety,"Wall-mounted ANSI certified first aid kit and sterile eye wash safety bottle.",-9.0,1.4,6.0,"safety,medical,first_aid,emergency",0
+coffee-station,"Refreshment & Coffee Corner",amenity,"Espresso machine, hot water dispenser, and organic tea collection.",8.5,0.9,5.5,"coffee,water,break,pantry",0

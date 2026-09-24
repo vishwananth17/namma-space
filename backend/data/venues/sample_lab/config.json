@@ -1,0 +1,42 @@
+{
+  "id": "sample_lab",
+  "name": "Robotics & AI Research Lab",
+  "description": "Synthetic benchmark venue: 20m x 15m indoor lab environment with workstations, robotics pen, and conference area.",
+  "model_file": "models/sample_room.glb",
+  "model_format": "glb",
+  "units": "meters",
+  "up_axis": "Y",
+  "floor_height": 0.0,
+  "bounds": {
+    "min": {
+      "x": -10.0,
+      "y": 0.0,
+      "z": -7.5
+    },
+    "max": {
+      "x": 10.0,
+      "y": 3.0,
+      "z": 7.5
+    }
+  },
+  "spawn_point": {
+    "position": {
+      "x": 0.0,
+      "y": 1.6,
+      "z": 5.0
+    },
+    "target": {
+      "x": 0.0,
+      "y": 1.2,
+      "z": 0.0
+    },
+    "yaw": 0.0,
+    "pitch": -0.05
+  },
+  "custom": {
+    "building": "Department of Computer Science & Engineering",
+    "campus": "IIT Bombay",
+    "grid_resolution": 0.15,
+    "agent_radius": 0.3
+  }
+}
