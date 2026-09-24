@@ -1,8 +1,42 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 import numpy as np
-import scipy.ndimage
+
+try:
+    import scipy.ndimage
+    _HAS_SCIPY = True
+except ImportError:
+    scipy = None
+    _HAS_SCIPY = False
 
 from app.algorithms.occupancy_grid import OccupancyGrid, STATE_WALKABLE
+
+
+def _label_components_fallback(binary_walkable: np.ndarray) -> Tuple[np.ndarray, int, List[int]]:
+    """8-connected component labeling fallback in pure Python/NumPy."""
+    H, W = binary_walkable.shape
+    labeled = np.zeros((H, W), dtype=np.int32)
+    current_label = 0
+    region_sizes = []
+    neighbors = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
+    for r in range(H):
+        for c in range(W):
+            if binary_walkable[r, c] == 1 and labeled[r, c] == 0:
+                current_label += 1
+                count = 0
+                stack = [(r, c)]
+                labeled[r, c] = current_label
+                while stack:
+                    cr, cc = stack.pop()
+                    count += 1
+                    for dr, dc in neighbors:
+                        nr, nc = cr + dr, cc + dc
+                        if 0 <= nr < H and 0 <= nc < W:
+                            if binary_walkable[nr, nc] == 1 and labeled[nr, nc] == 0:
+                                labeled[nr, nc] = current_label
+                                stack.append((nr, nc))
+                region_sizes.append(count)
+    return labeled, current_label, region_sizes
 
 
 class RegionAnalysisReport:
@@ -34,17 +68,12 @@ class RegionAnalysisReport:
 
 def analyze_walkable_regions(grid: OccupancyGrid) -> RegionAnalysisReport:
     """Identifies and measures disconnected walkable islands using connected component labeling."""
-    # 8-connected structuring element for adjacency
-    structure = np.ones((3, 3), dtype=np.int32)
     binary_walkable = (grid.data == STATE_WALKABLE).astype(np.int32)
-
-    labeled_array, num_features = scipy.ndimage.label(binary_walkable, structure=structure)
     cell_area = grid.cell_size * grid.cell_size
-
     total_cells = int(np.sum(binary_walkable))
     total_area = total_cells * cell_area
 
-    if num_features == 0 or total_cells == 0:
+    if total_cells == 0:
         return RegionAnalysisReport(
             total_walkable_cells=0,
             total_walkable_area_m2=0.0,
@@ -53,10 +82,31 @@ def analyze_walkable_regions(grid: OccupancyGrid) -> RegionAnalysisReport:
             has_disconnected_regions=False,
         )
 
-    # Measure sizes of each labeled component
-    region_sizes = scipy.ndimage.sum(binary_walkable, labeled_array, range(1, num_features + 1))
-    if not isinstance(region_sizes, np.ndarray):
-        region_sizes = np.array([region_sizes])
+    if _HAS_SCIPY and scipy is not None:
+        structure = np.ones((3, 3), dtype=np.int32)
+        labeled_array, num_features = scipy.ndimage.label(binary_walkable, structure=structure)
+        if num_features == 0:
+            return RegionAnalysisReport(
+                total_walkable_cells=0,
+                total_walkable_area_m2=0.0,
+                num_regions=0,
+                regions=[],
+                has_disconnected_regions=False,
+            )
+        raw_sizes = scipy.ndimage.sum(binary_walkable, labeled_array, range(1, num_features + 1))
+        if not isinstance(raw_sizes, np.ndarray):
+            raw_sizes = np.array([raw_sizes])
+        region_sizes = [int(s) for s in raw_sizes]
+    else:
+        labeled_array, num_features, region_sizes = _label_components_fallback(binary_walkable)
+        if num_features == 0:
+            return RegionAnalysisReport(
+                total_walkable_cells=0,
+                total_walkable_area_m2=0.0,
+                num_regions=0,
+                regions=[],
+                has_disconnected_regions=False,
+            )
 
     regions_info = []
     for idx, count in enumerate(region_sizes, start=1):

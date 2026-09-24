@@ -1,7 +1,13 @@
 from pathlib import Path
 from typing import Optional
 import numpy as np
-import trimesh
+
+try:
+    import trimesh
+    _HAS_TRIMESH = True
+except ImportError:
+    trimesh = None
+    _HAS_TRIMESH = False
 
 from app.algorithms.occupancy_grid import OccupancyGrid, STATE_OBSTACLE, STATE_WALKABLE
 from app.models.venue import VenueMetadata
@@ -37,8 +43,8 @@ def generate_occupancy_grid_from_mesh(
     grid.set_obstacle_box(venue.bounds.min.x, venue.bounds.min.x + 0.2, venue.bounds.min.z, venue.bounds.max.z)
     grid.set_obstacle_box(venue.bounds.max.x - 0.2, venue.bounds.max.x, venue.bounds.min.z, venue.bounds.max.z)
 
-    # 3. Load 3D model using Trimesh
-    if model_file_path.exists():
+    # 3. Load 3D model using Trimesh (if available and file exists)
+    if model_file_path.exists() and _HAS_TRIMESH and trimesh is not None:
         try:
             loaded = trimesh.load(model_file_path)
             if isinstance(loaded, trimesh.Scene):

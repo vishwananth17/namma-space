@@ -19,3 +19,8 @@ desktop.ini
 
 # Logs
 *.log
+
+# Deployment & Build caches
+.vercel
+_uv/
+uv.lock
