@@ -61,8 +61,7 @@ def init_db() -> None:
                                             description=p.get("description", ""),
                                             pos_x=pos.get("x", 0.0),
                                             pos_y=pos.get("y", 0.0),
-                                            pos_z=pos.get("z", 0.0),
-                                            tags=",".join(p.get("tags", [])) if isinstance(p.get("tags"), list) else str(p.get("tags", "")),
+                                            tags_json=json.dumps(p.get("tags", []) if isinstance(p.get("tags"), list) else [t.strip() for t in str(p.get("tags", "")).split(",") if t.strip()]),
                                             floor=p.get("floor", 0),
                                         )
                                         db.add(record)

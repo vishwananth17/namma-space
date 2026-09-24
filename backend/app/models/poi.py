@@ -42,13 +42,26 @@ class POIRecord(Base):
     @property
     def tags(self) -> List[str]:
         try:
-            return json.loads(self.tags_json) if self.tags_json else []
+            parsed = json.loads(self.tags_json) if self.tags_json else []
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, str):
+                return [t.strip() for t in parsed.split(",") if t.strip()]
+            return []
         except Exception:
+            if self.tags_json and isinstance(self.tags_json, str):
+                return [t.strip() for t in self.tags_json.split(",") if t.strip()]
             return []
 
     @tags.setter
-    def tags(self, value: List[str]):
-        self.tags_json = json.dumps(value or [])
+    def tags(self, value: Any):
+        if isinstance(value, list):
+            self.tags_json = json.dumps(value)
+        elif isinstance(value, str):
+            items = [t.strip() for t in value.split(",") if t.strip()]
+            self.tags_json = json.dumps(items)
+        else:
+            self.tags_json = "[]"
 
     @property
     def position(self) -> Point3D:
