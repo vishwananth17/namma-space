@@ -99,6 +99,16 @@ export class UIController {
     this.btnCloseQrModal = document.getElementById('btn-close-qr-modal');
     this.qrSpotBtns = document.querySelectorAll('.qr-spot-btn');
 
+    // Venue Upload & Ingestion Modal
+    this.btnUploadVenue = document.getElementById('btn-upload-venue');
+    this.modalUploadVenue = document.getElementById('modal-upload-venue');
+    this.btnCloseUploadModal = document.getElementById('btn-close-upload-modal');
+    this.btnCancelUpload = document.getElementById('btn-cancel-upload');
+    this.btnSubmitUpload = document.getElementById('btn-submit-upload');
+    this.uploadVenueName = document.getElementById('upload-venue-name');
+    this.uploadVenueId = document.getElementById('upload-venue-id');
+    this.uploadFileInput = document.getElementById('upload-file-input');
+
     // Internal state
     this.searchDebounceTimer = null;
     this.activePOI = null;
@@ -167,6 +177,29 @@ export class UIController {
       this.hideQrModal();
     });
 
+    // Upload Venue Modal Controls
+    this.btnUploadVenue?.addEventListener('click', () => {
+      this.showUploadModal();
+    });
+
+    this.btnCloseUploadModal?.addEventListener('click', () => {
+      this.hideUploadModal();
+    });
+
+    this.btnCancelUpload?.addEventListener('click', () => {
+      this.hideUploadModal();
+    });
+
+    this.uploadVenueName?.addEventListener('input', (e) => {
+      if (this.uploadVenueId && !this.uploadVenueId.dataset.manuallyEdited) {
+        this.uploadVenueId.value = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      }
+    });
+
+    this.uploadVenueId?.addEventListener('input', () => {
+      this.uploadVenueId.dataset.manuallyEdited = 'true';
+    });
+
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement !== this.searchInput) {
@@ -177,6 +210,7 @@ export class UIController {
         this.hidePlaceSheet();
         this.hideAddPoiModal();
         this.hideQrModal();
+        this.hideUploadModal();
       }
     });
   }
@@ -218,6 +252,22 @@ export class UIController {
 
   hideQrModal() {
     this.modalQrCode?.classList.add('hidden');
+  }
+
+  // --- Upload Venue UI ---
+  showUploadModal() {
+    if (this.uploadVenueName) this.uploadVenueName.value = '';
+    if (this.uploadVenueId) {
+      this.uploadVenueId.value = '';
+      delete this.uploadVenueId.dataset.manuallyEdited;
+    }
+    if (this.uploadFileInput) this.uploadFileInput.value = '';
+    this.modalUploadVenue?.classList.remove('hidden');
+    this.uploadVenueName?.focus();
+  }
+
+  hideUploadModal() {
+    this.modalUploadVenue?.classList.add('hidden');
   }
 
   // --- Voice Synthesis (Google Maps style) ---

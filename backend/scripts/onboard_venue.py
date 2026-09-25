@@ -105,8 +105,11 @@ def onboard_venue(
     models_dir.mkdir(parents=True, exist_ok=True)
 
     dest_model = models_dir / model_src.name
-    print(f"[1/7] Copying 3D asset -> {dest_model.relative_to(settings.BASE_DIR)}")
-    shutil.copy2(model_src, dest_model)
+    if model_src.resolve() != dest_model.resolve():
+        print(f"[1/7] Copying 3D asset -> {dest_model.relative_to(settings.BASE_DIR)}")
+        shutil.copy2(model_src, dest_model)
+    else:
+        print(f"[1/7] 3D asset already at destination -> {dest_model.relative_to(settings.BASE_DIR)}")
 
     # Inspect 3D model geometry
     print(f"[2/7] Analyzing 3D mesh geometry...")

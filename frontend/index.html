@@ -6,6 +6,11 @@
   <title>NammaSpace 3D | Indoor Google Maps & Digital Twin</title>
   <meta name="description" content="Indoor Google Maps experience for 3D digital twins with obstacle-aware A* pathfinding, turn-by-turn spoken directions, and live user blue dot tracking.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📍</text></svg>">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NammaSpace">
 
   <!-- Google Fonts: Google Sans / Inter & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,6 +184,11 @@
         <span style="font-size: 16px;">✏️</span>
       </button>
 
+      <!-- Upload 3D Model / Video Button -->
+      <button class="gmaps-fab" id="btn-upload-venue" title="Upload 3D Model (.glb) or Walkthrough Video to Create Venue">
+        <span style="font-size: 16px;">📤</span>
+      </button>
+
       <!-- Dynamic Hazard Simulation Button -->
       <button class="gmaps-fab gmaps-fab-hazard" id="btn-inject-spill" title="Simulate Floor Obstacle / Spill (Live Reroute)">
         <span style="font-size: 16px;">⚠️</span>
@@ -242,6 +252,35 @@
           <img id="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=http%3A%2F%2Flocalhost%3A8000%2F%3Fvenue%3Dcity_hospital%26spot%3Dmain-entrance%26dest%3Dicu-ward-4a" alt="Indoor Location QR Code" width="130" height="130">
           <span style="font-size: 11px; color: var(--text-sub); margin-top: 6px;">Pillar QR Code • Scan to Jump to Entrance & Route to ICU</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Upload 3D Model / Video Modal -->
+    <div id="modal-upload-venue" class="gmaps-modal glass-panel hidden">
+      <div class="modal-header">
+        <span class="modal-title">📤 Onboard 3D Model or Walkthrough Video</span>
+        <button class="modal-close-btn" id="btn-close-upload-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px;">
+          Select a <strong>.GLB</strong> / <strong>.GLTF</strong> 3D model or an indoor <strong>.MP4</strong> walkthrough video to generate an interactive 3D twin:
+        </p>
+        <div class="modal-form-group">
+          <label for="upload-venue-name">Space Name</label>
+          <input type="text" id="upload-venue-name" placeholder="e.g. Fortis Cardiac Wing, IIT Lab">
+        </div>
+        <div class="modal-form-group">
+          <label for="upload-venue-id">Venue Identifier (lowercase, no spaces)</label>
+          <input type="text" id="upload-venue-id" placeholder="e.g. cardiac_wing">
+        </div>
+        <div class="modal-form-group">
+          <label for="upload-file-input">Select File (.glb, .gltf, .ply, .mp4, .mov)</label>
+          <input type="file" id="upload-file-input" accept=".glb,.gltf,.ply,.obj,.mp4,.mov">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn-secondary" id="btn-cancel-upload">Cancel</button>
+        <button class="modal-btn-primary" id="btn-submit-upload">Process & Onboard</button>
       </div>
     </div>
 

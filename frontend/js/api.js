@@ -81,6 +81,23 @@ class ApiClient {
     });
   }
 
+  async uploadVenue(formData) {
+    const response = await fetch(`${this.baseUrl}/venues/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      let errData;
+      try {
+        errData = await response.json();
+      } catch {
+        errData = { message: response.statusText };
+      }
+      throw new Error(errData.message || `Upload failed with HTTP ${response.status}`);
+    }
+    return await response.json();
+  }
+
   async searchPOIs(venueId, query, userPos = null) {
     const params = new URLSearchParams({ q: query });
     if (userPos && userPos.x !== undefined && userPos.z !== undefined) {

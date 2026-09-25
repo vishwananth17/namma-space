@@ -128,3 +128,12 @@ def test_frontend_viewer_served(client):
     assert "NammaSpace 3D" in response.text
     assert "webgl-canvas" in response.text
 
+
+def test_upload_venue_unsupported_format(client):
+    """POST /venues/upload with unsupported file extension should return 400."""
+    files = {"file": ("test.txt", b"plain text content", "text/plain")}
+    data = {"venue_id": "test_invalid", "name": "Invalid Venue"}
+    response = client.post("/venues/upload", data=data, files=files)
+    assert response.status_code == 400
+    assert "Unsupported file format" in response.json()["message"]
+

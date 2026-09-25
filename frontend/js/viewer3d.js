@@ -608,6 +608,18 @@ export class Viewer3D {
     const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
     this.pathGroup.add(tubeMesh);
 
+    // 2B. Glowing pulsating route dots
+    const dotsGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+    const dotsMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.16,
+      transparent: true,
+      opacity: 0.85
+    });
+    const dotsMesh = new THREE.Points(dotsGeo, dotsMat);
+    dotsMesh.name = 'routeDots';
+    this.pathGroup.add(dotsMesh);
+
     // 3. Destination Iconic Red 3D Google Pin 📍
     while (this.destinationPinGroup.children.length > 0) {
       this.destinationPinGroup.remove(this.destinationPinGroup.children[0]);
@@ -871,6 +883,17 @@ export class Viewer3D {
     if (pulseRing) {
       const s = 1.0 + Math.sin(time * 0.003) * 0.35;
       pulseRing.scale.set(s, s, 1);
+    }
+
+    // Pulse route dots along navigation path
+    const routeDots = this.pathGroup.getObjectByName('routeDots');
+    if (routeDots && routeDots.material) {
+      routeDots.material.opacity = 0.5 + Math.sin(time * 0.006) * 0.35;
+    }
+
+    // Floating bounce for destination pin
+    if (this.destinationPinGroup && this.destinationPinGroup.children.length > 0) {
+      this.destinationPinGroup.position.y = Math.sin(time * 0.004) * 0.12;
     }
 
     // Rotate compass needle based on camera azimuthal angle

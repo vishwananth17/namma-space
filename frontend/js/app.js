@@ -65,6 +65,11 @@ class App {
       }
 
       this.ui.showToast('NammaSpace Indoor Maps Ready 📍', 'success');
+
+      // Register PWA Service Worker for offline indoor performance
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
     } catch (err) {
       console.error('Initialization failed:', err);
       this.ui.showToast(`Backend connection notice: ${err.message}`, 'error');
@@ -469,6 +474,55 @@ class App {
         this._calibrateAtSpot(spotKey);
         this.ui.hideQrModal();
       });
+    });
+
+    // 18. Upload 3D Model / Walkthrough Video to Onboard Space
+    this.ui.btnSubmitUpload?.addEventListener('click', async () => {
+      const name = this.ui.uploadVenueName?.value.trim();
+      const venueId = this.ui.uploadVenueId?.value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+      const file = this.ui.uploadFileInput?.files?.[0];
+
+      if (!name) {
+        this.ui.showToast('Please enter a space/venue name.', 'error');
+        return;
+      }
+      if (!venueId) {
+        this.ui.showToast('Please enter a venue ID.', 'error');
+        return;
+      }
+      if (!file) {
+        this.ui.showToast('Please select a 3D model (.glb) or walkthrough video file.', 'error');
+        return;
+      }
+
+      this.ui.btnSubmitUpload.disabled = true;
+      this.ui.btnSubmitUpload.textContent = 'Processing Asset...';
+      this.ui.showLoading('Onboarding New Space...', 'Uploading asset, slicing 3D geometry & generating navigation grid...', 40);
+
+      const formData = new FormData();
+      formData.append('venue_id', venueId);
+      formData.append('name', name);
+      formData.append('file', file);
+
+      try {
+        const newVenue = await api.uploadVenue(formData);
+        this.ui.hideUploadModal();
+
+        // Refresh venue dropdown
+        const venues = await api.listVenues();
+        this.ui.populateVenues(venues, newVenue.id);
+
+        // Switch to the newly onboarded venue
+        await this.loadVenue(newVenue.id);
+        this.ui.showToast(`🎉 "${name}" onboarded and live in 3D!`, 'success');
+      } catch (err) {
+        console.error('Failed to onboard venue:', err);
+        this.ui.showToast(`Onboarding failed: ${err.message}`, 'error');
+      } finally {
+        this.ui.hideLoading();
+        this.ui.btnSubmitUpload.disabled = false;
+        this.ui.btnSubmitUpload.textContent = 'Process & Onboard';
+      }
     });
   }
 
