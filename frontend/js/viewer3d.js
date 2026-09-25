@@ -273,8 +273,8 @@ export class Viewer3D {
       this.camera.position.set(pos.x, pos.y + 6, pos.z + 9);
       this.controls.target.set(target.x, target.y, target.z);
 
-      // Default blue dot near spawn
-      this.setUserPosition(pos.x, pos.z - 2, 0);
+      // Default blue dot at spawn location
+      this.setUserPosition(pos.x, pos.z, 0);
     }
 
     const bounds = venueData.bounds || {

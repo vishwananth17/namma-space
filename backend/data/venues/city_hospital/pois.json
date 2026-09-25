@@ -1,0 +1,92 @@
+[
+  {
+    "id": "main-entrance",
+    "name": "Main Hospital Entrance & Triage Desk",
+    "category": "exit",
+    "description": "Primary patient entry with reception, wheelchair assistance, and immediate emergency triage.",
+    "position": { "x": 0.0, "y": 1.0, "z": 7.0 },
+    "tags": ["entrance", "exit", "triage", "reception", "lobby", "doors", "admissions"],
+    "floor": 0
+  },
+  {
+    "id": "icu-ward-4a",
+    "name": "Intensive Care Unit (ICU - Ward 4A)",
+    "category": "safety",
+    "description": "Level-1 Critical Care Unit equipped with 24/7 intensivists, hemodynamic monitors, central oxygen, and invasive ventilators.",
+    "position": { "x": -8.0, "y": 0.8, "z": -5.5 },
+    "tags": ["icu", "intensive_care", "critical_care", "emergency", "life_support", "ward4a", "ventilator", "respiratory"],
+    "floor": 0
+  },
+  {
+    "id": "emergency-trauma",
+    "name": "24/7 Emergency & Trauma Bay",
+    "category": "safety",
+    "description": "Immediate acute trauma resuscitation and ambulance intake station.",
+    "position": { "x": 7.5, "y": 0.8, "z": 5.5 },
+    "tags": ["emergency", "trauma", "ambulance", "urgent_care", "er", "casualty"],
+    "floor": 0
+  },
+  {
+    "id": "central-pharmacy",
+    "name": "Central Hospital Pharmacy & Dispensary",
+    "category": "amenity",
+    "description": "24-hour computerized pharmacy providing emergency prescription and critical care medications.",
+    "position": { "x": -6.5, "y": 0.8, "z": 2.5 },
+    "tags": ["pharmacy", "medicine", "chemist", "dispensary", "drugs", "prescription"],
+    "floor": 0
+  },
+  {
+    "id": "radiology-imaging",
+    "name": "Radiology & MRI / CT Diagnostic Center",
+    "category": "lab_equipment",
+    "description": "Advanced imaging suite with 3T MRI, 128-slice CT scanner, and bedside digital X-ray.",
+    "position": { "x": 6.5, "y": 0.8, "z": -1.5 },
+    "tags": ["radiology", "mri", "ct_scan", "xray", "ultrasound", "scan", "imaging"],
+    "floor": 0
+  },
+  {
+    "id": "blood-bank-pathology",
+    "name": "Clinical Pathology & Blood Bank",
+    "category": "lab_equipment",
+    "description": "NABH-accredited blood component bank and automated diagnostic pathology lab.",
+    "position": { "x": 8.0, "y": 0.8, "z": -6.0 },
+    "tags": ["blood_bank", "lab", "pathology", "blood", "tests", "serology"],
+    "floor": 0
+  },
+  {
+    "id": "cardiac-care-unit",
+    "name": "Cardiac Care Unit (CCU & Cath Lab)",
+    "category": "safety",
+    "description": "Specialized coronary intensive care and rapid intervention catheterization lab.",
+    "position": { "x": -4.0, "y": 0.8, "z": -6.5 },
+    "tags": ["cardiac", "heart", "ccu", "cath_lab", "ecg", "angioplasty"],
+    "floor": 0
+  },
+  {
+    "id": "central-elevators",
+    "name": "Stretcher & Visitor Elevators",
+    "category": "exit",
+    "description": "High-capacity stretcher lifts connecting to Level 2 (Modular Operation Theaters) and Level 3 (Private Inpatient Wards).",
+    "position": { "x": 0.0, "y": 0.8, "z": -1.0 },
+    "tags": ["elevator", "lift", "stretcher", "stairs", "vertical_transit"],
+    "floor": 0
+  },
+  {
+    "id": "patient-billing",
+    "name": "Admissions & Insurance Desk",
+    "category": "workstation",
+    "description": "Cashless TPA insurance approvals, patient admissions, and administrative billing.",
+    "position": { "x": 3.5, "y": 0.8, "z": 4.5 },
+    "tags": ["billing", "insurance", "admissions", "tpa", "registration", "cashier"],
+    "floor": 0
+  },
+  {
+    "id": "hospital-cafeteria",
+    "name": "Doctor & Visitor Cafeteria",
+    "category": "amenity",
+    "description": "Healthy patient diet meals, warm beverages, and visitor refreshments.",
+    "position": { "x": -9.0, "y": 0.8, "z": 5.0 },
+    "tags": ["cafeteria", "coffee", "food", "canteen", "snacks", "tea"],
+    "floor": 0
+  }
+]

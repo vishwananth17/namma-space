@@ -12,7 +12,7 @@ class App {
     this.viewer = new Viewer3D(this.canvas);
     this.ui = new UIController();
 
-    this.currentVenueId = 'sample_lab';
+    this.currentVenueId = 'city_hospital';
     this.currentVenueData = null;
     this.pois = [];
     this.activeRoute = null;
@@ -151,6 +151,9 @@ class App {
               if (fullPOI) {
                 this.viewer.selectPOI(fullPOI.id);
                 this.viewer.onPOIClick(fullPOI);
+                this.ui.navGoalSelect.value = fullPOI.id;
+                this.ui.navStartSelect.value = 'user_pos';
+                this._triggerRoute();
               }
             }
           );
@@ -182,6 +185,11 @@ class App {
             const fullPOI = this.pois.find((p) => p.id === selectedItem.id) || selectedItem;
             this.viewer.selectPOI(fullPOI.id);
             this.viewer.onPOIClick(fullPOI);
+
+            // Auto-queue indoor navigation from Blue Dot to destination (e.g. ICU)
+            this.ui.navGoalSelect.value = fullPOI.id;
+            this.ui.navStartSelect.value = 'user_pos';
+            this._triggerRoute();
           });
         } catch (err) {
           console.error('Search error:', err);

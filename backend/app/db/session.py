@@ -41,11 +41,12 @@ def init_db() -> None:
         with SessionLocal() as db:
             from app.models.poi import POIRecord
             import json
-            if db.query(POIRecord).count() == 0:
-                venues_dir = settings.VENUES_DIR
-                if venues_dir.exists():
-                    for venue_dir in venues_dir.iterdir():
-                        if venue_dir.is_dir():
+            venues_dir = settings.VENUES_DIR
+            if venues_dir.exists():
+                for venue_dir in venues_dir.iterdir():
+                    if venue_dir.is_dir():
+                        v_id = venue_dir.name
+                        if db.query(POIRecord).filter(POIRecord.venue_id == v_id).count() == 0:
                             pois_file = venue_dir / "pois.json"
                             if pois_file.exists():
                                 try:
@@ -55,7 +56,7 @@ def init_db() -> None:
                                         pos = p.get("position", {})
                                         record = POIRecord(
                                             id=p["id"],
-                                            venue_id=p.get("venue_id", venue_dir.name),
+                                            venue_id=p.get("venue_id", v_id),
                                             name=p["name"],
                                             category=p.get("category", "general"),
                                             description=p.get("description", ""),

@@ -1,0 +1,42 @@
+{
+  "id": "city_hospital",
+  "name": "Apollo Multi-Specialty Hospital & Trauma Center",
+  "description": "24/7 Super-specialty tertiary hospital complex featuring Level-1 Trauma Care, Intensive Care Units (ICU), Diagnostics, and Inpatient Services.",
+  "model_file": "models/hospital_room.glb",
+  "model_format": "glb",
+  "units": "meters",
+  "up_axis": "Y",
+  "floor_height": 0.0,
+  "bounds": {
+    "min": {
+      "x": -12.0,
+      "y": 0.0,
+      "z": -9.0
+    },
+    "max": {
+      "x": 12.0,
+      "y": 3.5,
+      "z": 9.0
+    }
+  },
+  "spawn_point": {
+    "position": {
+      "x": 0.0,
+      "y": 1.6,
+      "z": 7.2
+    },
+    "target": {
+      "x": 0.0,
+      "y": 1.0,
+      "z": 0.0
+    },
+    "yaw": 0.0,
+    "pitch": -0.05
+  },
+  "custom": {
+    "building": "Apollo Central Clinical Block",
+    "campus": "Apollo Medical Campus",
+    "grid_resolution": 0.15,
+    "agent_radius": 0.35
+  }
+}
