@@ -18,6 +18,8 @@ class App {
     this.activeRoute = null;
     this.navmeshVisible = false;
     this.currentFloor = 0;
+    this.editorMode = false;
+    this.pendingPoiCoords = null;
 
     this._setupEventHandlers();
   }
@@ -36,6 +38,32 @@ class App {
 
       // 3. Load default venue
       await this.loadVenue(this.currentVenueId);
+
+      // 4. Check for QR deep link or URL parameters (OpenIndoorMaps QR Localization)
+      const params = new URLSearchParams(window.location.search);
+      const venueParam = params.get('venue');
+      const spotParam = params.get('spot');
+      const destParam = params.get('dest');
+
+      if (venueParam && venueParam !== this.currentVenueId) {
+        await this.loadVenue(venueParam);
+      }
+      if (spotParam) {
+        this._calibrateAtSpot(spotParam);
+      }
+      if (destParam) {
+        const destMatch = this.pois.find((p) => {
+          const id = p.id.toLowerCase();
+          const name = p.name.toLowerCase();
+          return id === destParam.toLowerCase() || name.includes(destParam.toLowerCase());
+        });
+        if (destMatch) {
+          this.ui.navGoalSelect.value = destMatch.id;
+          this.ui.navStartSelect.value = 'user_pos';
+          await this._triggerRoute();
+        }
+      }
+
       this.ui.showToast('NammaSpace Indoor Maps Ready 📍', 'success');
     } catch (err) {
       console.error('Initialization failed:', err);
@@ -119,8 +147,13 @@ class App {
       );
     };
 
-    // 3. Floor Click -> Move Blue Dot
+    // 3. Floor Click -> Move Blue Dot or Place 3D Landmark (Editor Mode)
     this.viewer.onFloorClick = (pt) => {
+      if (this.editorMode) {
+        this.pendingPoiCoords = { x: pt.x, z: pt.z };
+        this.ui.showAddPoiModal(this.pendingPoiCoords);
+        return;
+      }
       this.ui.showToast(`User location updated: (${pt.x.toFixed(1)}m, ${pt.z.toFixed(1)}m)`, 'info');
       // If start is set to user_pos and active route exists, auto-recalculate
       if (this.ui.navStartSelect.value === 'user_pos' && this.ui.navGoalSelect.value) {
@@ -377,6 +410,93 @@ class App {
         this.ui.showToast(`Failed to place hazard: ${err.message}`, 'error');
       }
     });
+
+    // 15. 3D Map Editor Toggle (OpenIndoorMaps 3D Editor)
+    this.ui.btnToggleEditor?.addEventListener('click', () => {
+      this.editorMode = !this.editorMode;
+      this.viewer.editorMode = this.editorMode;
+      this.ui.setEditorModeActive(this.editorMode);
+    });
+
+    // 16. Save New 3D POI Landmark
+    this.ui.btnSavePoi?.addEventListener('click', async () => {
+      if (!this.pendingPoiCoords) {
+        this.ui.showToast('Please click on the 3D floor to choose a position first.', 'error');
+        return;
+      }
+      const name = this.ui.poiInputName?.value.trim();
+      if (!name) {
+        this.ui.showToast('Please enter a landmark name.', 'error');
+        return;
+      }
+      const category = this.ui.poiInputCategory?.value || 'safety';
+      const description = this.ui.poiInputDesc?.value.trim() || undefined;
+      const tagsRaw = this.ui.poiInputTags?.value.trim();
+      const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : [];
+
+      this.ui.btnSavePoi.disabled = true;
+      this.ui.btnSavePoi.textContent = 'Saving to 3D Space...';
+
+      try {
+        const newPoi = await api.createPOI(this.currentVenueId, {
+          name,
+          category,
+          position: { x: this.pendingPoiCoords.x, y: 0.1, z: this.pendingPoiCoords.z },
+          floor: this.currentFloor,
+          description,
+          tags
+        });
+
+        this.pois.push(newPoi);
+        this.viewer.renderPOIs(this.pois);
+        this.ui.populatePOIs(this.pois);
+        this.ui.hideAddPoiModal();
+        this.pendingPoiCoords = null;
+        this.ui.showToast(`✅ "${name}" saved to 3D Map!`, 'success');
+      } catch (err) {
+        console.error('Failed to create POI:', err);
+        this.ui.showToast(`Failed to save POI: ${err.message}`, 'error');
+      } finally {
+        this.ui.btnSavePoi.disabled = false;
+        this.ui.btnSavePoi.textContent = 'Save to 3D Map';
+      }
+    });
+
+    // 17. QR Code Indoor Localization Spots
+    this.ui.qrSpotBtns?.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const spotKey = btn.getAttribute('data-poi');
+        this._calibrateAtSpot(spotKey);
+        this.ui.hideQrModal();
+      });
+    });
+  }
+
+  _calibrateAtSpot(spotKey) {
+    if (!spotKey) return;
+    const query = spotKey.toLowerCase().replace(/[-_]/g, ' ');
+    const match = this.pois.find((p) => {
+      const id = p.id.toLowerCase();
+      const name = p.name.toLowerCase();
+      return (
+        id === spotKey.toLowerCase() ||
+        id.includes(spotKey.toLowerCase()) ||
+        name.includes(query) ||
+        spotKey.toLowerCase().includes(id)
+      );
+    });
+
+    if (match) {
+      this.viewer.setUserPosition(match.position.x, match.position.z, 0);
+      this.viewer.recenterOnUser();
+      this.ui.showToast(`📍 QR calibrated at: ${match.name}`, 'success');
+      if (this.ui.navGoalSelect.value && this.ui.navGoalSelect.value !== match.id) {
+        this.ui.navStartSelect.value = 'user_pos';
+        this._triggerRoute();
+      }
+    } else {
+      this.ui.showToast(`Calibrating indoor position for "${spotKey}"...`, 'info');
+    }
   }
 
   async _triggerRoute() {

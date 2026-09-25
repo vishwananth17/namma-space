@@ -33,6 +33,7 @@ export class Viewer3D {
     this.isTopDown = false;
     this.navigationActive = false;
     this.navTween = null;
+    this.editorMode = false;
 
     // User Blue Dot ("You Are Here")
     this.userPos = { x: 0.0, y: 0.1, z: 2.0, headingDeg: 0 };
@@ -391,11 +392,13 @@ export class Viewer3D {
       }
     }
 
-    // 2. Check Floor Click -> Move User Blue Dot!
+    // 2. Check Floor Click -> Move User Blue Dot or Place 3D Landmark
     const floorIntersects = this.raycaster.intersectObjects(this.venueGroup.children, true);
     if (floorIntersects.length > 0) {
       const pt = floorIntersects[0].point;
-      this.setUserPosition(pt.x, pt.z);
+      if (!this.editorMode) {
+        this.setUserPosition(pt.x, pt.z);
+      }
       if (this.onFloorClick) this.onFloorClick({ x: pt.x, z: pt.z });
     }
   }

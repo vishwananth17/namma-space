@@ -80,6 +80,25 @@ export class UIController {
     this.tooltipCategory = document.getElementById('tooltip-category');
     this.toastContainer = document.getElementById('toast-container');
 
+    // 3D Map Editor & POI Placement (OpenIndoorMaps 3D Editor)
+    this.btnToggleEditor = document.getElementById('btn-toggle-editor');
+    this.modalAddPoi = document.getElementById('modal-add-poi');
+    this.modalPoiCoords = document.getElementById('modal-poi-coords');
+    this.poiInputName = document.getElementById('poi-input-name');
+    this.poiInputCategory = document.getElementById('poi-input-category');
+    this.poiInputDesc = document.getElementById('poi-input-desc');
+    this.poiInputTags = document.getElementById('poi-input-tags');
+    this.btnClosePoiModal = document.getElementById('btn-close-poi-modal');
+    this.btnCancelAddPoi = document.getElementById('btn-cancel-add-poi');
+    this.btnSavePoi = document.getElementById('btn-save-poi');
+    this.editorMode = false;
+
+    // QR Code Indoor Localization (OpenIndoorMaps)
+    this.btnScanQr = document.getElementById('btn-scan-qr');
+    this.modalQrCode = document.getElementById('modal-qr-code');
+    this.btnCloseQrModal = document.getElementById('btn-close-qr-modal');
+    this.qrSpotBtns = document.querySelectorAll('.qr-spot-btn');
+
     // Internal state
     this.searchDebounceTimer = null;
     this.activePOI = null;
@@ -130,6 +149,24 @@ export class UIController {
       }
     });
 
+    // 3D Editor Modal Controls
+    this.btnClosePoiModal?.addEventListener('click', () => {
+      this.hideAddPoiModal();
+    });
+
+    this.btnCancelAddPoi?.addEventListener('click', () => {
+      this.hideAddPoiModal();
+    });
+
+    // QR Code Modal Controls
+    this.btnScanQr?.addEventListener('click', () => {
+      this.showQrModal();
+    });
+
+    this.btnCloseQrModal?.addEventListener('click', () => {
+      this.hideQrModal();
+    });
+
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement !== this.searchInput) {
@@ -138,8 +175,49 @@ export class UIController {
       } else if (e.key === 'Escape') {
         this.hideSearchResults();
         this.hidePlaceSheet();
+        this.hideAddPoiModal();
+        this.hideQrModal();
       }
     });
+  }
+
+  // --- 3D Map Editor & POI Creation UI ---
+  showAddPoiModal(coords) {
+    if (!this.modalAddPoi) return;
+    if (this.modalPoiCoords) {
+      this.modalPoiCoords.textContent = `📍 Floor Coordinates: X: ${coords.x.toFixed(2)}m, Z: ${coords.z.toFixed(2)}m`;
+    }
+    if (this.poiInputName) this.poiInputName.value = '';
+    if (this.poiInputDesc) this.poiInputDesc.value = '';
+    if (this.poiInputTags) this.poiInputTags.value = '';
+    this.modalAddPoi.classList.remove('hidden');
+    this.poiInputName?.focus();
+  }
+
+  hideAddPoiModal() {
+    this.modalAddPoi?.classList.add('hidden');
+  }
+
+  setEditorModeActive(active) {
+    this.editorMode = active;
+    if (this.btnToggleEditor) {
+      this.btnToggleEditor.classList.toggle('active', active);
+    }
+    if (active) {
+      this.showToast('✏️ 3D Editor ON: Click anywhere on 3D floor to place landmark', 'info');
+    } else {
+      this.showToast('3D Editor Mode exited', 'info');
+      this.hideAddPoiModal();
+    }
+  }
+
+  // --- QR Code Localization UI ---
+  showQrModal() {
+    this.modalQrCode?.classList.remove('hidden');
+  }
+
+  hideQrModal() {
+    this.modalQrCode?.classList.add('hidden');
   }
 
   // --- Voice Synthesis (Google Maps style) ---

@@ -74,6 +74,13 @@ class ApiClient {
     return await this._fetch(`/venues/${encodeURIComponent(venueId)}/pois${queryStr}`);
   }
 
+  async createPOI(venueId, poi) {
+    return await this._fetch(`/venues/${encodeURIComponent(venueId)}/pois`, {
+      method: 'POST',
+      body: JSON.stringify(poi)
+    });
+  }
+
   async searchPOIs(venueId, query, userPos = null) {
     const params = new URLSearchParams({ q: query });
     if (userPos && userPos.x !== undefined && userPos.z !== undefined) {
