@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NammaSpace 3D | Indoor Digital Twin & Spatial Navigation</title>
-  <meta name="description" content="Production-grade 3D Digital Twin platform with obstacle-aware A* pathfinding, typo-tolerant POI search, and sub-millisecond spatial queries.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>NammaSpace 3D | Indoor Google Maps & Digital Twin</title>
+  <meta name="description" content="Indoor Google Maps experience for 3D digital twins with obstacle-aware A* pathfinding, turn-by-turn spoken directions, and live user blue dot tracking.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📍</text></svg>">
 
-  <!-- Google Fonts: Outfit & Inter -->
+  <!-- Google Fonts: Google Sans / Inter & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- Import maps polyfill & Three.js ES Modules -->
+  <!-- Import maps for Three.js -->
   <script type="importmap">
     {
       "imports": {
@@ -23,276 +23,265 @@
       }
     }
   </script>
-  <!-- Tween.js for smooth camera transitions & route tour animations -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/20.0.0/tween.umd.js"></script>
 </head>
-<body>
+<body class="indoor-maps-mode">
   <div id="app">
-    <!-- Top Navigation Bar -->
-    <header class="top-nav glass-panel">
-      <div class="nav-left">
-        <div class="brand">
-          <div class="brand-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-          </div>
-          <div class="brand-text">
-            <span class="brand-name">NammaSpace</span>
-            <span class="brand-badge">3D Twin</span>
-          </div>
-        </div>
-
-        <!-- Venue Selector Dropdown -->
-        <div class="venue-selector-container">
-          <label for="venue-select" class="sr-only">Active Venue</label>
-          <div class="select-wrapper">
-            <svg class="select-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
-            <select id="venue-select" aria-label="Select Venue">
-              <option value="" disabled selected>Loading venues...</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Action Controls -->
-      <div class="nav-right">
-        <div class="backend-status-pill" id="backend-status" title="FastAPI Backend Health">
-          <span class="status-dot pulsing"></span>
-          <span class="status-label" id="backend-status-text">Connecting...</span>
-          <span class="latency-badge" id="backend-latency">-- ms</span>
-        </div>
-
-        <button class="nav-btn" id="btn-toggle-view" title="Toggle 3D Perspective / Top-Down View">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="22" y1="12" x2="18" y2="12"></line>
-            <line x1="6" y1="12" x2="2" y2="12"></line>
-            <line x1="12" y1="6" x2="12" y2="2"></line>
-            <line x1="12" y1="22" x2="12" y2="18"></line>
+    <!-- Top Floating Search & Brand Bar (Google Maps Style) -->
+    <div class="gmaps-top-container">
+      <div class="gmaps-search-box glass-panel">
+        <button class="gmaps-search-icon-btn" id="btn-menu" title="Venue Selector & Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
-          <span class="btn-text">Top-Down</span>
         </button>
 
-        <button class="nav-btn" id="btn-toggle-navmesh" title="Toggle 2D Occupancy Grid Floor Map">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-            <line x1="3" y1="15" x2="21" y2="15"></line>
-            <line x1="9" y1="3" x2="9" y2="21"></line>
-            <line x1="15" y1="3" x2="15" y2="21"></line>
-          </svg>
-          <span class="btn-text">Navmesh</span>
-        </button>
-
-        <button class="nav-btn" id="btn-reset-camera" title="Reset Camera to Venue Spawn Point">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-            <path d="M3 3v5h5"></path>
-          </svg>
-          <span class="btn-text">Reset</span>
-        </button>
-
-        <a href="/docs" target="_blank" rel="noopener" class="nav-btn nav-btn-accent" title="Interactive Swagger API Contract">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          <span class="btn-text">API Docs</span>
-        </a>
-      </div>
-    </header>
-
-    <!-- Floating Top Search Bar (Typo-Tolerant Multi-Field) -->
-    <div class="search-container">
-      <div class="search-input-wrapper glass-panel">
-        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
         <input 
           type="text" 
           id="search-input" 
-          placeholder="Search POIs, equipment, rooms... (e.g. 'wrkstation', 'cofee', 'drone')" 
-          autocomplete="off"
+          placeholder="Search indoor space (e.g. 'coffee', '3d printer', 'workstation')" 
+          autocomplete="off" 
           spellcheck="false"
         >
-        <span class="search-shortcut-badge">/</span>
-        <button id="search-clear-btn" class="search-clear-btn hidden" title="Clear Search">✕</button>
+
+        <div class="search-box-right">
+          <button id="search-clear-btn" class="search-clear-btn hidden" title="Clear Search">✕</button>
+          <div class="search-divider"></div>
+          <button class="gmaps-directions-trigger-btn" id="btn-open-directions" title="Directions">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M22.43 10.59l-9.01-9.01c-.75-.75-2.07-.75-2.83 0l-9 9c-.78.78-.78 2.04 0 2.83l9 9c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l9.01-9.01c.79-.78.79-2.05.01-2.81zM13.5 14.5V12H9v-3h4.5V6.5L17 10.5l-3.5 4z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Category Exploration Chips (Google Maps Style) -->
+      <div class="gmaps-category-chips">
+        <button class="gmaps-chip" data-category="workstation">
+          <span class="chip-icon">💻</span>
+          <span>Desks</span>
+        </button>
+        <button class="gmaps-chip" data-category="amenity">
+          <span class="chip-icon">☕</span>
+          <span>Coffee & Food</span>
+        </button>
+        <button class="gmaps-chip" data-category="lab_equipment">
+          <span class="chip-icon">🔬</span>
+          <span>Lab & 3D Print</span>
+        </button>
+        <button class="gmaps-chip" data-category="safety">
+          <span class="chip-icon">🩹</span>
+          <span>First Aid</span>
+        </button>
+        <button class="gmaps-chip" data-category="exit">
+          <span class="chip-icon">🚪</span>
+          <span>Exits</span>
+        </button>
       </div>
 
       <!-- Autocomplete Dropdown -->
-      <div id="search-results-dropdown" class="search-results-dropdown glass-panel hidden">
+      <div id="search-results-dropdown" class="gmaps-results-dropdown glass-panel hidden">
         <!-- Rendered dynamically -->
       </div>
     </div>
 
-    <!-- Navigation & Pathfinding Sidebar / Drawer -->
-    <aside class="nav-drawer glass-panel" id="nav-drawer">
-      <div class="drawer-header">
-        <div class="drawer-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-          </svg>
-          <span>Obstacle-Aware Navigation</span>
-        </div>
-        <button class="drawer-toggle-btn" id="drawer-toggle-btn" title="Toggle Navigation Panel">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </button>
+    <!-- Active Turn-by-Turn Navigation Header (Iconic Google Maps Green Banner) -->
+    <div id="active-navigation-banner" class="gmaps-nav-banner hidden">
+      <div class="nav-banner-icon-box" id="nav-banner-icon">
+        <!-- Directional arrow SVG -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </div>
+      <div class="nav-banner-details">
+        <div class="nav-banner-distance" id="nav-banner-distance">In 5 m</div>
+        <div class="nav-banner-instruction" id="nav-banner-instruction">Depart from Workstation Alpha heading North.</div>
+        <div class="nav-banner-next" id="nav-banner-next">Then turn right past Bulk Desk B</div>
+      </div>
+      <button class="nav-voice-btn" id="btn-toggle-voice" title="Mute/Unmute Spoken Voice Navigation">
+        <span id="voice-icon">🔊</span>
+      </button>
+    </div>
+
+    <!-- Floating Right-Side Controls (Google Maps Standard) -->
+    <div class="gmaps-floating-controls">
+      <!-- Venue Selector Menu Dropdown -->
+      <div class="gmaps-control-card glass-panel venue-card">
+        <svg class="venue-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <select id="venue-select" aria-label="Select Indoor Venue">
+          <option value="" disabled selected>Venues...</option>
+        </select>
       </div>
 
-      <div class="drawer-content">
-        <!-- Origin & Destination Form -->
-        <div class="nav-form">
-          <div class="nav-input-group">
-            <div class="point-indicator point-start">A</div>
-            <div class="select-wrapper flex-1">
-              <select id="nav-start-select" aria-label="Route Start Point">
-                <option value="">Choose Starting Point...</option>
-              </select>
-            </div>
-            <button class="icon-btn-subtle" id="btn-use-camera-start" title="Use current 3D camera position">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-            </button>
-          </div>
+      <!-- Compass (Rotates with 3D camera) -->
+      <button class="gmaps-fab" id="btn-compass" title="Re-orient North">
+        <div class="compass-needle" id="compass-needle">
+          <div class="needle-north"></div>
+          <div class="needle-south"></div>
+        </div>
+      </button>
 
-          <div class="nav-swap-row">
-            <div class="nav-line-connector"></div>
-            <button class="nav-swap-btn" id="btn-swap-points" title="Swap Start and Destination">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8v12M17 20l4-4M17 20l-4-4"></path>
-              </svg>
-            </button>
-          </div>
+      <!-- 2D / 3D Tilt View Mode -->
+      <button class="gmaps-fab" id="btn-toggle-view" title="Toggle 2D / 3D View">
+        <span class="fab-label" id="view-mode-label">3D</span>
+      </button>
 
-          <div class="nav-input-group">
-            <div class="point-indicator point-goal">B</div>
-            <div class="select-wrapper flex-1">
-              <select id="nav-goal-select" aria-label="Route Destination Point">
-                <option value="">Choose Destination...</option>
-              </select>
-            </div>
-          </div>
+      <!-- Floor / Navmesh Layer Toggle -->
+      <button class="gmaps-fab" id="btn-toggle-navmesh" title="Toggle Obstacle Navmesh Floor Grid">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+          <line x1="3" y1="15" x2="21" y2="15"></line>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+          <line x1="15" y1="3" x2="15" y2="21"></line>
+        </svg>
+      </button>
 
-          <!-- Options -->
-          <div class="nav-options">
-            <label class="toggle-control">
-              <input type="checkbox" id="nav-smooth-toggle" checked>
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">Line-of-Sight Smoothing (Raycasting)</span>
-            </label>
-          </div>
+      <!-- Recenter on User Blue Dot -->
+      <button class="gmaps-fab gmaps-fab-accent" id="btn-recenter-user" title="Re-center on My Location">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="12" r="7"></circle>
+          <line x1="12" y1="2" x2="12" y2="5"></line>
+          <line x1="12" y1="19" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="5" y2="12"></line>
+          <line x1="19" y1="12" x2="22" y2="12"></line>
+        </svg>
+      </button>
 
-          <!-- Action Button -->
-          <button class="nav-submit-btn" id="btn-calculate-route">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="6" y1="3" x2="6" y2="15"></line>
-              <circle cx="18" cy="6" r="3"></circle>
-              <circle cx="6" cy="18" r="3"></circle>
-              <path d="M18 9a9 9 0 0 1-9 9"></path>
+      <!-- Floor Level Pill (Floor 0 / Floor 1) -->
+      <div class="gmaps-floor-selector glass-panel">
+        <button class="floor-btn active" data-floor="0">L1</button>
+        <button class="floor-btn" data-floor="1">L2</button>
+      </div>
+
+      <!-- Dynamic Hazard Simulation Button -->
+      <button class="gmaps-fab gmaps-fab-hazard" id="btn-inject-spill" title="Simulate Floor Obstacle / Spill (Live Reroute)">
+        <span style="font-size: 16px;">⚠️</span>
+      </button>
+    </div>
+
+    <!-- Google Maps Directions Sheet (Origin -> Destination) -->
+    <aside class="gmaps-directions-panel glass-panel hidden" id="directions-panel">
+      <div class="directions-panel-header">
+        <div class="travel-mode-tabs">
+          <button class="travel-tab active" title="Walking">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="4" r="2"></circle>
+              <path d="M19 13v-2c-1.54.02-3.09-.75-4.07-1.83l-1.29-1.43c-.17-.19-.38-.34-.61-.45-.01 0-.01-.01-.02-.01H13c-.35-.2-.75-.3-1.19-.26-.82.08-1.53.6-1.87 1.34L8 16v5h2v-4.5l1.64-3.5 2.16 2.38V21h2v-7.13c0-.62-.25-1.21-.69-1.64l-.99-1.09.58-.64c.73.81 1.77 1.38 2.87 1.5z"></path>
             </svg>
-            <span>Compute Optimal Path</span>
+            <span>Walk</span>
+          </button>
+          <button class="travel-tab" title="Wheelchair / Accessible Route">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="4" r="2"></circle>
+              <path d="M19 13v-2c-1.54.02-3.09-.75-4.07-1.83l-1.29-1.43c-.17-.19-.38-.34-.61-.45-.01 0-.01-.01-.02-.01H13c-.35-.2-.75-.3-1.19-.26-.82.08-1.53.6-1.87 1.34L8 16v5h2v-4.5l1.64-3.5 2.16 2.38V21h2v-7.13c0-.62-.25-1.21-.69-1.64l-.99-1.09.58-.64c.73.81 1.77 1.38 2.87 1.5z"></path>
+            </svg>
+            <span>Accessible</span>
           </button>
         </div>
+        <button class="close-panel-btn" id="btn-close-directions">✕</button>
+      </div>
 
-        <!-- Route Results Summary -->
-        <div id="route-summary" class="route-summary-panel hidden">
-          <div class="route-metrics-grid">
-            <div class="metric-card">
-              <span class="metric-label">Distance</span>
-              <span class="metric-value text-accent" id="metric-distance">0.0 m</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Est. Walk</span>
-              <span class="metric-value" id="metric-time">0 s</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">A* Latency</span>
-              <span class="metric-value text-emerald" id="metric-latency">0 ms</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Waypoints</span>
-              <span class="metric-value" id="metric-waypoints">0</span>
-            </div>
-          </div>
-
-          <!-- Dynamic Obstacle Reroute Alert -->
-          <div id="route-reroute-alert" class="route-reroute-alert hidden">
-            <span class="alert-icon">⚠️</span>
-            <span class="alert-text" id="route-reroute-text">Path diverted around dynamic hazard.</span>
-          </div>
-
-          <!-- Interactive Tour / Walkthrough Controls -->
-          <div class="route-tour-controls">
-            <button class="btn-tour" id="btn-start-tour">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              <span>Walkthrough Tour</span>
-            </button>
-            <button class="btn-clear-route" id="btn-clear-route" title="Clear Path from 3D View">
-              Clear Path
-            </button>
-          </div>
-
-          <!-- Turn-by-Turn Natural Directions -->
-          <div class="directions-container">
-            <div class="directions-header">
-              <span>Turn-by-Turn Directions</span>
-              <span class="directions-count" id="directions-count">0 steps</span>
-            </div>
-            <div class="directions-list" id="directions-list">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Waypoints Timeline -->
-          <div class="waypoints-list-container">
-            <div class="waypoints-header">Waypoint Trajectory</div>
-            <div class="waypoints-list" id="waypoints-list">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
+      <div class="directions-inputs">
+        <div class="input-line">
+          <div class="circle-start"></div>
+          <select id="nav-start-select" aria-label="Starting location">
+            <option value="user_pos">📍 My Current Location (Blue Dot)</option>
+          </select>
         </div>
-
-        <!-- Dynamic Obstacle Simulation Section -->
-        <div class="obstacles-section">
-          <div class="section-subheading-row">
-            <span class="section-subheading">Dynamic Hazard Simulation</span>
-            <span class="obstacle-count-badge" id="obstacle-count-badge">0 Active</span>
-          </div>
-          <div class="obstacle-btn-row">
-            <button class="btn-hazard" id="btn-inject-spill" title="Simulate a chemical/water spill obstacle on the floor">
-              <span>⚠️ Drop Hazard Spill</span>
-            </button>
-            <button class="btn-hazard-clear" id="btn-clear-hazards" title="Clear all active dynamic obstacles">
-              Clear
-            </button>
-          </div>
+        <div class="input-divider">
+          <div class="dotted-line"></div>
+          <button class="btn-swap-locations" id="btn-swap-points" title="Reverse route">⇅</button>
         </div>
+        <div class="input-line">
+          <div class="pin-goal"></div>
+          <select id="nav-goal-select" aria-label="Destination">
+            <option value="">Choose destination...</option>
+          </select>
+        </div>
+      </div>
 
-        <!-- Quick POI Discovery Chips -->
-        <div class="quick-chips-section">
-          <span class="section-subheading">Quick Destinations</span>
-          <div class="chips-container" id="quick-poi-chips">
-            <!-- Dynamically populated -->
-          </div>
+      <!-- Action Button -->
+      <button class="gmaps-get-route-btn" id="btn-calculate-route">
+        <span>Find Indoor Route</span>
+      </button>
+
+      <!-- Step List Accordion -->
+      <div id="directions-step-container" class="directions-step-container hidden">
+        <div class="route-summary-quick">
+          <span class="route-time-val" id="route-time-val">15 s</span>
+          <span class="route-dist-val" id="route-dist-val">(18.5 m)</span>
+          <span class="route-latency-badge" id="route-latency-badge">A* 18ms</span>
+        </div>
+        <!-- Reroute Notice -->
+        <div id="route-reroute-alert" class="route-reroute-alert hidden">
+          <span>⚠️ Rerouted around floor spill hazard!</span>
+        </div>
+        <div class="steps-list" id="directions-list">
+          <!-- Populated dynamically -->
         </div>
       </div>
     </aside>
+
+    <!-- Google Maps Bottom Trip Bar (Active Navigation / ETA) -->
+    <div id="gmaps-trip-bar" class="gmaps-trip-bar glass-panel hidden">
+      <div class="trip-info">
+        <div class="trip-time" id="trip-time">15 sec</div>
+        <div class="trip-sub">
+          <span id="trip-distance">18.5 m</span>
+          <span>•</span>
+          <span id="trip-steps-count">5 steps</span>
+          <span>•</span>
+          <span class="trip-fastest">Fastest indoor path</span>
+        </div>
+      </div>
+
+      <div class="trip-actions">
+        <button class="btn-start-navigation" id="btn-start-navigation">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span id="nav-btn-text">Start</span>
+        </button>
+        <button class="btn-exit-navigation" id="btn-exit-navigation" title="Exit Route">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- Place Details Bottom Sheet (When clicking any POI) -->
+    <div id="gmaps-place-sheet" class="gmaps-place-sheet glass-panel hidden">
+      <button class="sheet-close-btn" id="btn-close-place-sheet">✕</button>
+      <div class="place-header">
+        <span class="place-category-badge" id="place-category">Workstation</span>
+        <h2 class="place-title" id="place-title">Workstation Alpha</h2>
+      </div>
+      <p class="place-description" id="place-description">High-performance GPU cluster rig.</p>
+      
+      <div class="place-meta-bar">
+        <span class="meta-item">📍 <strong id="place-coords">(-5.0, -3.0)</strong></span>
+        <span class="meta-item">🏢 Floor <strong id="place-floor">L1</strong></span>
+      </div>
+
+      <div class="place-tags" id="place-tags"></div>
+
+      <div class="place-actions-row">
+        <button class="btn-place-directions" id="btn-place-directions">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M22.43 10.59l-9.01-9.01c-.75-.75-2.07-.75-2.83 0l-9 9c-.78.78-.78 2.04 0 2.83l9 9c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l9.01-9.01c.79-.78.79-2.05.01-2.81zM13.5 14.5V12H9v-3h4.5V6.5L17 10.5l-3.5 4z"></path>
+          </svg>
+          <span>Directions</span>
+        </button>
+        <button class="btn-place-secondary" id="btn-place-set-start">Set Start</button>
+        <button class="btn-place-secondary" id="btn-place-focus">Look At</button>
+      </div>
+    </div>
 
     <!-- Main 3D Canvas Viewport -->
     <div id="viewport-container">
@@ -302,85 +291,25 @@
       <div id="loading-overlay" class="loading-overlay">
         <div class="loader-card glass-panel">
           <div class="spinner"></div>
-          <div class="loader-title">Loading 3D Twin...</div>
-          <div class="loader-subtitle" id="loader-status">Fetching spatial configuration...</div>
+          <div class="loader-title">NammaSpace Indoor Maps</div>
+          <div class="loader-subtitle" id="loader-status">Locating indoor positions...</div>
           <div class="loader-progress-bar">
             <div class="loader-progress-fill" id="loader-progress-fill"></div>
           </div>
         </div>
       </div>
 
-      <!-- 3D Tooltip for Hovering Pins -->
+      <!-- Hover Tooltip -->
       <div id="poi-hover-tooltip" class="poi-hover-tooltip hidden">
-        <div class="tooltip-title" id="tooltip-title">POI Name</div>
+        <div class="tooltip-title" id="tooltip-title">Location</div>
         <div class="tooltip-category" id="tooltip-category">Category</div>
       </div>
     </div>
 
-    <!-- POI Detail Card (Floating Bottom-Right) -->
-    <div id="poi-detail-card" class="poi-detail-card glass-panel hidden">
-      <button class="card-close-btn" id="btn-close-poi-card" title="Close">✕</button>
-      <div class="card-header">
-        <span class="poi-category-badge" id="poi-card-category">Workstation</span>
-        <h3 class="poi-title" id="poi-card-title">Workstation Alpha</h3>
-      </div>
-      <p class="poi-description" id="poi-card-description">Description goes here.</p>
-      
-      <div class="poi-coords-bar">
-        <span class="coord-item"><strong>X:</strong> <span id="poi-card-x">0.00</span>m</span>
-        <span class="coord-item"><strong>Y:</strong> <span id="poi-card-y">0.00</span>m</span>
-        <span class="coord-item"><strong>Z:</strong> <span id="poi-card-z">0.00</span>m</span>
-        <span class="coord-item"><strong>Floor:</strong> <span id="poi-card-floor">0</span></span>
-      </div>
-
-      <div class="poi-tags" id="poi-card-tags">
-        <!-- Rendered tags -->
-      </div>
-
-      <div class="poi-actions">
-        <button class="poi-btn-action poi-btn-navigate" id="btn-poi-navigate-to">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-          </svg>
-          <span>Route Here</span>
-        </button>
-        <button class="poi-btn-action poi-btn-start" id="btn-poi-set-start">
-          Set as Start
-        </button>
-        <button class="poi-btn-action poi-btn-secondary" id="btn-poi-focus">
-          Center Camera
-        </button>
-      </div>
-    </div>
-
-    <!-- Performance & Telemetry HUD (Bottom-Left) -->
-    <div class="telemetry-hud glass-panel">
-      <div class="hud-item">
-        <span class="hud-label">FPS</span>
-        <span class="hud-value text-emerald" id="hud-fps">60</span>
-      </div>
-      <div class="hud-divider"></div>
-      <div class="hud-item">
-        <span class="hud-label">POIs</span>
-        <span class="hud-value" id="hud-pois-count">0</span>
-      </div>
-      <div class="hud-divider"></div>
-      <div class="hud-item">
-        <span class="hud-label">Bounds</span>
-        <span class="hud-value" id="hud-dimensions">-- m</span>
-      </div>
-      <div class="hud-divider"></div>
-      <div class="hud-item">
-        <span class="hud-label">API Latency</span>
-        <span class="hud-value text-accent" id="hud-api-latency">0 ms</span>
-      </div>
-    </div>
-
-    <!-- Toast Notification Container -->
+    <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <!-- Application Scripts -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

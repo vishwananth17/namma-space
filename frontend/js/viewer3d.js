@@ -1,5 +1,5 @@
 /**
- * NammaSpace 3D - Three.js Spatial Viewport & Digital Twin Engine
+ * NammaSpace 3D — Google Maps Indoor Viewport & Spatial Engine
  */
 
 import * as THREE from 'three';
@@ -15,11 +15,13 @@ export class Viewer3D {
     this.controls = null;
     this.gltfLoader = new GLTFLoader();
 
-    // Layers & Groups
+    // Scene Groups
     this.venueGroup = new THREE.Group();
     this.poiGroup = new THREE.Group();
     this.pathGroup = new THREE.Group();
     this.obstacleGroup = new THREE.Group();
+    this.userDotGroup = new THREE.Group();
+    this.destinationPinGroup = new THREE.Group();
     this.navmeshMesh = null;
 
     // Interaction & State
@@ -29,26 +31,27 @@ export class Viewer3D {
     this.selectedMarker = null;
     this.activeVenue = null;
     this.isTopDown = false;
-    this.tourActive = false;
-    this.tourTween = null;
+    this.navigationActive = false;
+    this.navTween = null;
+
+    // User Blue Dot ("You Are Here")
+    this.userPos = { x: 0.0, y: 0.1, z: 2.0, headingDeg: 0 };
+    this.userHeadingRad = 0;
 
     // Callbacks
     this.onPOIClick = null;
     this.onPOIHover = null;
+    this.onFloorClick = null;
+    this.onCameraRotate = null;
 
-    // Performance telemetry
-    this.fps = 60;
-    this._frameCount = 0;
-    this._lastFpsUpdate = performance.now();
-
-    // Category Color Palette
+    // Category Colors (Google Maps style)
     this.categoryColors = {
-      workstation: 0x00f2fe,    // Neon Cyan
-      lab_equipment: 0xa855f7,  // Electric Purple
-      amenity: 0xf59e0b,        // Warm Amber
-      safety: 0xef4444,         // Crimson
-      exit: 0x10b981,           // Emerald Green
-      default: 0x38bdf8         // Sky Blue
+      workstation: 0x1a73e8,   // Google Blue
+      lab_equipment: 0x9334e6, // Purple
+      amenity: 0xf29900,       // Warm Amber (Coffee/Food)
+      safety: 0xe52592,        // Pink/Red (First Aid)
+      exit: 0x0f9d58,          // Google Green
+      default: 0x1a73e8
     };
 
     this._init();
@@ -57,13 +60,13 @@ export class Viewer3D {
   _init() {
     // 1. Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0d14);
-    this.scene.fog = new THREE.FogExp2(0x0a0d14, 0.015);
+    this.scene.background = new THREE.Color(0x12151c);
+    this.scene.fog = new THREE.FogExp2(0x12151c, 0.018);
 
     // 2. Camera
     const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 500);
-    this.camera.position.set(0, 10, 20);
+    this.camera.position.set(0, 14, 18);
 
     // 3. Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -75,54 +78,123 @@ export class Viewer3D {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // 4. Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Prevent going underground
+    this.controls.dampingFactor = 0.06;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.02;
     this.controls.minDistance = 1;
-    this.controls.maxDistance = 150;
+    this.controls.maxDistance = 120;
     this.controls.target.set(0, 0, 0);
 
     // 5. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     this.scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xdbeafe, 1.2);
-    sunLight.position.set(15, 25, 10);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 100;
-    const d = 25;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    this.scene.add(sunLight);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(12, 24, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    this.scene.add(sun);
 
-    const blueRimLight = new THREE.DirectionalLight(0x00f2fe, 0.4);
-    blueRimLight.position.set(-15, 10, -15);
-    this.scene.add(blueRimLight);
+    const softFill = new THREE.DirectionalLight(0x8ab4f8, 0.45);
+    softFill.position.set(-15, 12, -15);
+    this.scene.add(softFill);
 
     // 6. Base Groups
     this.scene.add(this.venueGroup);
     this.scene.add(this.poiGroup);
     this.scene.add(this.pathGroup);
     this.scene.add(this.obstacleGroup);
+    this.scene.add(this.userDotGroup);
+    this.scene.add(this.destinationPinGroup);
 
-    // 7. Event Listeners
+    // 7. Initialize User Blue Dot
+    this._createUserBlueDot();
+
+    // 8. Event Listeners
     window.addEventListener('resize', () => this._onWindowResize());
     this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
     this.canvas.addEventListener('click', (e) => this._onMouseClick(e));
 
-    // 8. Animation Loop
+    // 9. Animation Loop
     this._animate();
+  }
+
+  _createUserBlueDot() {
+    // 1. Central Core Blue Dot
+    const dotGeo = new THREE.SphereGeometry(0.24, 24, 24);
+    const dotMat = new THREE.MeshStandardMaterial({
+      color: 0x1a73e8,
+      emissive: 0x1a73e8,
+      emissiveIntensity: 0.5,
+      roughness: 0.2
+    });
+    const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+    dotMesh.position.y = 0.25;
+    this.userDotGroup.add(dotMesh);
+
+    // White Outer Ring
+    const whiteRingGeo = new THREE.RingGeometry(0.25, 0.32, 32);
+    const whiteRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const whiteRing = new THREE.Mesh(whiteRingGeo, whiteRingMat);
+    whiteRing.rotation.x = -Math.PI / 2;
+    whiteRing.position.y = 0.03;
+    this.userDotGroup.add(whiteRing);
+
+    // 2. Pulsing Radar Floor Ring
+    const pulseGeo = new THREE.RingGeometry(0.3, 0.9, 32);
+    const pulseMat = new THREE.MeshBasicMaterial({
+      color: 0x1a73e8,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide
+    });
+    const pulseRing = new THREE.Mesh(pulseGeo, pulseMat);
+    pulseRing.rotation.x = -Math.PI / 2;
+    pulseRing.position.y = 0.02;
+    pulseRing.name = 'userPulseRing';
+    this.userDotGroup.add(pulseRing);
+
+    // 3. Directional Heading Flashlight Cone
+    const coneShape = new THREE.Shape();
+    coneShape.moveTo(0, 0);
+    coneShape.lineTo(-0.7, 2.2);
+    coneShape.lineTo(0.7, 2.2);
+    coneShape.closePath();
+    const coneGeo = new THREE.ShapeGeometry(coneShape);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0x4285f4,
+      transparent: true,
+      opacity: 0.25,
+      side: THREE.DoubleSide
+    });
+    const headingCone = new THREE.Mesh(coneGeo, coneMat);
+    headingCone.rotation.x = -Math.PI / 2;
+    headingCone.position.y = 0.025;
+    headingCone.name = 'headingCone';
+    this.userDotGroup.add(headingCone);
+
+    this.userDotGroup.position.set(this.userPos.x, this.userPos.y, this.userPos.z);
+  }
+
+  setUserPosition(x, z, headingDeg = null) {
+    this.userPos.x = x;
+    this.userPos.z = z;
+    this.userDotGroup.position.set(x, 0.05, z);
+
+    if (headingDeg !== null) {
+      this.userPos.headingDeg = headingDeg;
+      const cone = this.userDotGroup.getObjectByName('headingCone');
+      if (cone) {
+        cone.rotation.z = -THREE.MathUtils.degToRad(headingDeg);
+      }
+    }
   }
 
   _onWindowResize() {
@@ -139,23 +211,19 @@ export class Viewer3D {
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // Raycast POI markers
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const intersects = this.raycaster.intersectObjects(this.poiGroup.children, true);
 
     if (intersects.length > 0) {
-      // Find top parent marker
       let obj = intersects[0].object;
       while (obj.parent && obj.parent !== this.poiGroup) {
         obj = obj.parent;
       }
-      if (obj && obj.userData && obj.userData.poi) {
+      if (obj?.userData?.poi) {
         if (this.hoveredMarker !== obj) {
           this.hoveredMarker = obj;
           this.canvas.style.cursor = 'pointer';
-          if (this.onPOIHover) {
-            this.onPOIHover(obj.userData.poi, event.clientX, event.clientY);
-          }
+          if (this.onPOIHover) this.onPOIHover(obj.userData.poi, event.clientX, event.clientY);
         }
         return;
       }
@@ -170,19 +238,27 @@ export class Viewer3D {
 
   _onMouseClick(event) {
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.poiGroup.children, true);
 
-    if (intersects.length > 0) {
-      let obj = intersects[0].object;
+    // 1. Check POI Click
+    const poiIntersects = this.raycaster.intersectObjects(this.poiGroup.children, true);
+    if (poiIntersects.length > 0) {
+      let obj = poiIntersects[0].object;
       while (obj.parent && obj.parent !== this.poiGroup) {
         obj = obj.parent;
       }
-      if (obj && obj.userData && obj.userData.poi) {
+      if (obj?.userData?.poi) {
         this.selectPOI(obj.userData.poi.id);
-        if (this.onPOIClick) {
-          this.onPOIClick(obj.userData.poi);
-        }
+        if (this.onPOIClick) this.onPOIClick(obj.userData.poi);
+        return;
       }
+    }
+
+    // 2. Check Floor Click -> Move User Blue Dot!
+    const floorIntersects = this.raycaster.intersectObjects(this.venueGroup.children, true);
+    if (floorIntersects.length > 0) {
+      const pt = floorIntersects[0].point;
+      this.setUserPosition(pt.x, pt.z);
+      if (this.onFloorClick) this.onFloorClick({ x: pt.x, z: pt.z });
     }
   }
 
@@ -190,15 +266,17 @@ export class Viewer3D {
     this.activeVenue = venueData;
     this.clearAll();
 
-    // 1. Position camera to venue spawn point
+    // Spawn camera
     if (venueData.spawn_point) {
       const pos = venueData.spawn_point.position;
       const target = venueData.spawn_point.target || { x: 0, y: 0, z: 0 };
-      this.camera.position.set(pos.x, pos.y + 4, pos.z + 8);
+      this.camera.position.set(pos.x, pos.y + 6, pos.z + 9);
       this.controls.target.set(target.x, target.y, target.z);
+
+      // Default blue dot near spawn
+      this.setUserPosition(pos.x, pos.z - 2, 0);
     }
 
-    // 2. Setup venue ground grid & bounds box
     const bounds = venueData.bounds || {
       min: { x: -10, y: 0, z: -7.5 },
       max: { x: 10, y: 3, z: 7.5 }
@@ -208,17 +286,12 @@ export class Viewer3D {
     const centerX = (bounds.min.x + bounds.max.x) / 2;
     const centerZ = (bounds.min.z + bounds.max.z) / 2;
 
-    // Architectural Ground Grid
-    const gridHelper = new THREE.GridHelper(Math.max(sizeX, sizeZ) * 1.5, 30, 0x00f2fe, 0x1e293b);
-    gridHelper.position.set(centerX, bounds.min.y, centerZ);
-    this.venueGroup.add(gridHelper);
-
-    // Floor platform plane
-    const floorGeo = new THREE.PlaneGeometry(sizeX, sizeZ);
+    // Stylized Floor Plane (Google Maps subtle dark ground)
+    const floorGeo = new THREE.PlaneGeometry(sizeX * 1.5, sizeZ * 1.5);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.8,
-      metalness: 0.2
+      color: 0x161a23,
+      roughness: 0.9,
+      metalness: 0.1
     });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.rotation.x = -Math.PI / 2;
@@ -226,8 +299,13 @@ export class Viewer3D {
     floorMesh.receiveShadow = true;
     this.venueGroup.add(floorMesh);
 
-    // 3. Load GLB Model
-    return new Promise((resolve, reject) => {
+    // Subtle Architectural Grid
+    const grid = new THREE.GridHelper(Math.max(sizeX, sizeZ) * 1.5, 30, 0x282e3d, 0x1c212d);
+    grid.position.set(centerX, bounds.min.y, centerZ);
+    this.venueGroup.add(grid);
+
+    // Load 3D Model
+    return new Promise((resolve) => {
       this.gltfLoader.load(
         modelUrl,
         (gltf) => {
@@ -236,23 +314,17 @@ export class Viewer3D {
             if (child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
-              if (child.material) {
-                child.material.side = THREE.DoubleSide;
-              }
             }
           });
           this.venueGroup.add(model);
           resolve(model);
         },
-        (xhr) => {
-          // Progress
-        },
-        (error) => {
-          console.warn('GLB load error or placeholder:', error);
-          // Fallback procedural room walls if GLB failed
-          const roomBox = new THREE.BoxGeometry(sizeX, bounds.max.y, sizeZ);
-          const wireframe = new THREE.WireframeGeometry(roomBox);
-          const line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ color: 0x334155 }));
+        null,
+        () => {
+          // Fallback room wireframe
+          const box = new THREE.BoxGeometry(sizeX, bounds.max.y, sizeZ);
+          const wire = new THREE.WireframeGeometry(box);
+          const line = new THREE.LineSegments(wire, new THREE.LineBasicMaterial({ color: 0x334155 }));
           line.position.set(centerX, bounds.max.y / 2, centerZ);
           this.venueGroup.add(line);
           resolve(null);
@@ -262,63 +334,52 @@ export class Viewer3D {
   }
 
   renderPOIs(poiList) {
-    // Clear existing POIs
     while (this.poiGroup.children.length > 0) {
-      const child = this.poiGroup.children[0];
-      this.poiGroup.remove(child);
+      this.poiGroup.remove(this.poiGroup.children[0]);
     }
 
     poiList.forEach((poi) => {
-      const marker = this._createPOIMarker(poi);
+      const marker = this._createGoogleMapsPin(poi);
       this.poiGroup.add(marker);
     });
   }
 
-  _createPOIMarker(poi) {
+  _createGoogleMapsPin(poi) {
     const group = new THREE.Group();
-    group.position.set(poi.position.x, poi.position.y || 0.8, poi.position.z);
+    group.position.set(poi.position.x, poi.position.y || 0.6, poi.position.z);
     group.userData = { poi };
 
     const colorHex = this.categoryColors[poi.category] || this.categoryColors.default;
 
-    // 1. 3D Diamond / Pin
-    const pinGeo = new THREE.OctahedronGeometry(0.35, 0);
+    // 1. Google Pin 3D Mesh
+    const pinGeo = new THREE.ConeGeometry(0.24, 0.6, 16);
+    pinGeo.rotateX(Math.PI);
     const pinMat = new THREE.MeshStandardMaterial({
       color: colorHex,
-      emissive: colorHex,
-      emissiveIntensity: 0.4,
-      roughness: 0.2,
-      metalness: 0.8
+      roughness: 0.3,
+      metalness: 0.4
     });
-    const pinMesh = new THREE.Mesh(pinGeo, pinMat);
-    pinMesh.position.y = 0.5;
-    pinMesh.name = 'pinMesh';
-    group.add(pinMesh);
+    const pin = new THREE.Mesh(pinGeo, pinMat);
+    pin.position.y = 0.5;
+    pin.name = 'pinMesh';
+    group.add(pin);
 
-    // 2. Vertical stem line to floor
-    const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8);
-    const stemMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.6 });
-    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
-    stemMesh.position.y = 0.25;
-    group.add(stemMesh);
+    const capGeo = new THREE.SphereGeometry(0.24, 16, 16);
+    const cap = new THREE.Mesh(capGeo, pinMat);
+    cap.position.y = 0.7;
+    group.add(cap);
 
-    // 3. Ground Pulsing Ring
-    const ringGeo = new THREE.RingGeometry(0.2, 0.35, 24);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: colorHex,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.5
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.y = -(poi.position.y || 0.8) + 0.03;
-    ringMesh.name = 'ringMesh';
-    group.add(ringMesh);
+    // 2. Ground Anchor Dot
+    const dotGeo = new THREE.CircleGeometry(0.12, 16);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 });
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.y = -(poi.position.y || 0.6) + 0.02;
+    group.add(dot);
 
-    // 4. Billboarded Canvas Label
+    // 3. Floating Label
     const sprite = this._createTextSprite(poi.name, colorHex);
-    sprite.position.y = 1.1;
+    sprite.position.y = 1.25;
     group.add(sprite);
 
     return group;
@@ -330,30 +391,27 @@ export class Viewer3D {
     canvas.height = 64;
     const ctx = canvas.getContext('2d');
 
-    // Background pill
-    ctx.fillStyle = 'rgba(16, 20, 31, 0.85)';
-    ctx.roundRect(10, 10, 236, 44, 12);
+    ctx.fillStyle = 'rgba(28, 33, 45, 0.9)';
+    ctx.roundRect(8, 8, 240, 48, 24);
     ctx.fill();
 
-    // Border
     ctx.strokeStyle = `#${colorHex.toString(16).padStart(6, '0')}`;
     ctx.lineWidth = 2.5;
-    ctx.roundRect(10, 10, 236, 44, 12);
+    ctx.roundRect(8, 8, 240, 48, 24);
     ctx.stroke();
 
-    // Text
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 19px Google Sans, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const truncated = text.length > 16 ? text.substring(0, 15) + '…' : text;
+    const truncated = text.length > 17 ? text.substring(0, 16) + '…' : text;
     ctx.fillText(truncated, 128, 32);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(1.8, 0.45, 1.0);
+    sprite.scale.set(1.6, 0.4, 1.0);
     return sprite;
   }
 
@@ -364,12 +422,10 @@ export class Viewer3D {
       const pin = child.getObjectByName('pinMesh');
       if (pin) {
         if (isTarget) {
-          pin.scale.set(1.4, 1.4, 1.4);
-          pin.material.emissiveIntensity = 0.9;
+          pin.scale.set(1.3, 1.3, 1.3);
           found = child;
         } else {
           pin.scale.set(1, 1, 1);
-          pin.material.emissiveIntensity = 0.4;
         }
       }
     });
@@ -377,13 +433,9 @@ export class Viewer3D {
     if (found) {
       this.selectedMarker = found;
       this.flyTo(
-        {
-          x: found.position.x,
-          y: found.position.y + 2.5,
-          z: found.position.z + 4.5
-        },
+        { x: found.position.x, y: found.position.y + 3, z: found.position.z + 4.5 },
         found.position,
-        800
+        700
       );
     }
   }
@@ -392,122 +444,133 @@ export class Viewer3D {
     this.clearPath();
     if (!waypoints || waypoints.length < 2) return;
 
-    // 1. Build 3D Points Elevated Above Ground
-    const points = waypoints.map((wp) => new THREE.Vector3(wp.x, (wp.y || 0.0) + 0.15, wp.z));
-
-    // Smooth curve
+    const points = waypoints.map((wp) => new THREE.Vector3(wp.x, 0.12, wp.z));
     const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.15);
-    const curvePoints = curve.getPoints(Math.max(waypoints.length * 10, 50));
+    const curvePoints = curve.getPoints(Math.max(waypoints.length * 8, 40));
 
-    // 2. Glowing Neon Polyline
+    // 1. Google Maps Vibrant Royal Blue Path Line
     const lineGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
     const lineMat = new THREE.LineBasicMaterial({
-      color: 0x00f2fe,
-      linewidth: 4,
+      color: 0x1a73e8,
+      linewidth: 5,
       transparent: true,
       opacity: 0.95
     });
     const pathLine = new THREE.Line(lineGeo, lineMat);
     this.pathGroup.add(pathLine);
 
-    // 3. Glowing Tube for volumetric glow
-    const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.05, 8, false);
-    const tubeMat = new THREE.MeshBasicMaterial({
-      color: 0x00f2fe,
-      transparent: true,
-      opacity: 0.45,
-      wireframe: true
-    });
+    // 2. Smooth 3D Tube for elevation and soft glow
+    const tubeGeo = new THREE.TubeGeometry(curve, 48, 0.06, 8, false);
+    const tubeMat = new THREE.MeshBasicMaterial({ color: 0x4285f4, transparent: true, opacity: 0.7 });
     const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
     this.pathGroup.add(tubeMesh);
 
-    // 4. Waypoint Node Markers
-    waypoints.forEach((wp, index) => {
-      const isStart = index === 0;
-      const isGoal = index === waypoints.length - 1;
-      const color = isStart ? 0x10b981 : isGoal ? 0x00f2fe : 0x64748b;
-      const radius = isStart || isGoal ? 0.22 : 0.12;
+    // 3. Destination Iconic Red 3D Google Pin 📍
+    while (this.destinationPinGroup.children.length > 0) {
+      this.destinationPinGroup.remove(this.destinationPinGroup.children[0]);
+    }
+    const dest = waypoints[waypoints.length - 1];
+    const redPinGeo = new THREE.ConeGeometry(0.3, 0.8, 16);
+    redPinGeo.rotateX(Math.PI);
+    const redPinMat = new THREE.MeshStandardMaterial({ color: 0xea4335, roughness: 0.2 });
+    const redPin = new THREE.Mesh(redPinGeo, redPinMat);
+    redPin.position.set(dest.x, 0.8, dest.z);
+    this.destinationPinGroup.add(redPin);
 
-      const nodeGeo = new THREE.SphereGeometry(radius, 16, 16);
-      const nodeMat = new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: color,
-        emissiveIntensity: 0.8
-      });
-      const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
-      nodeMesh.position.set(wp.x, (wp.y || 0.0) + 0.15, wp.z);
-      this.pathGroup.add(nodeMesh);
-    });
+    const redCapGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const redCap = new THREE.Mesh(redCapGeo, redPinMat);
+    redCap.position.set(dest.x, 1.1, dest.z);
+    this.destinationPinGroup.add(redCap);
 
-    // 5. Adjust camera to frame path nicely
+    // Frame camera
     const box = new THREE.Box3().setFromPoints(points);
     const center = new THREE.Vector3();
     box.getCenter(center);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const maxDim = Math.max(size.x, size.z, 5);
+    const maxDim = Math.max(size.x, size.z, 6);
 
     this.flyTo(
       { x: center.x, y: center.y + maxDim * 1.1, z: center.z + maxDim * 1.1 },
       center,
-      900
+      800
     );
   }
 
   clearPath() {
-    this.stopWalkTour();
+    this.stopNavigation();
     while (this.pathGroup.children.length > 0) {
-      const child = this.pathGroup.children[0];
-      this.pathGroup.remove(child);
+      this.pathGroup.remove(this.pathGroup.children[0]);
+    }
+    while (this.destinationPinGroup.children.length > 0) {
+      this.destinationPinGroup.remove(this.destinationPinGroup.children[0]);
     }
   }
 
-  startWalkTour(waypoints, onComplete) {
+  startNavigation(waypoints, onStepChange, onComplete) {
     if (!waypoints || waypoints.length < 2) return;
-    this.stopWalkTour();
-    this.tourActive = true;
+    this.stopNavigation();
+    this.navigationActive = true;
 
     let currentIndex = 0;
-    const walkSpeed = 1.6; // meters per second
+    const walkSpeed = 1.3; // Google Maps walking speed (1.3 m/s)
 
     const stepToNext = () => {
-      if (!this.tourActive || currentIndex >= waypoints.length - 1) {
-        this.tourActive = false;
+      if (!this.navigationActive || currentIndex >= waypoints.length - 1) {
+        this.navigationActive = false;
         if (onComplete) onComplete();
         return;
       }
+
+      if (onStepChange) onStepChange(currentIndex);
 
       const current = waypoints[currentIndex];
       const next = waypoints[currentIndex + 1];
       const dx = next.x - current.x;
       const dz = next.z - current.z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
-      const durationMs = Math.max(400, (distance / walkSpeed) * 1000);
+      const dist = Math.hypot(dx, dz);
+      const durationMs = Math.max(450, (dist / walkSpeed) * 1000);
 
-      const startPos = {
-        x: this.camera.position.x,
-        y: this.camera.position.y,
-        z: this.camera.position.z,
-        tx: this.controls.target.x,
-        ty: this.controls.target.y,
-        tz: this.controls.target.z
+      // Compute heading
+      const rad = Math.atan2(dx, -dz);
+      const headingDeg = (THREE.MathUtils.radToDeg(rad) + 360) % 360;
+
+      const startState = {
+        x: current.x,
+        z: current.z,
+        camX: this.camera.position.x,
+        camY: this.camera.position.y,
+        camZ: this.camera.position.z,
+        tarX: this.controls.target.x,
+        tarY: this.controls.target.y,
+        tarZ: this.controls.target.z
       };
 
-      const targetPos = {
-        x: next.x - dx * 0.2,
-        y: (next.y || 0.0) + 1.6, // Eye height
-        z: next.z - dz * 0.2,
-        tx: next.x + dx * 0.5,
-        ty: (next.y || 0.0) + 1.2,
-        tz: next.z + dz * 0.5
-      };
+      // Camera rides smoothly behind the user
+      const camOffsetDist = 3.5;
+      const camHeight = 2.4;
+      const targetCamX = next.x - Math.sin(rad) * camOffsetDist;
+      const targetCamZ = next.z + Math.cos(rad) * camOffsetDist;
 
-      this.tourTween = new window.TWEEN.Tween(startPos)
-        .to(targetPos, durationMs)
-        .easing(window.TWEEN.Easing.Quadratic.InOut)
+      this.navTween = new window.TWEEN.Tween(startState)
+        .to(
+          {
+            x: next.x,
+            z: next.z,
+            camX: targetCamX,
+            camY: camHeight,
+            camZ: targetCamZ,
+            tarX: next.x + Math.sin(rad) * 2,
+            tarY: 1.0,
+            tarZ: next.z - Math.cos(rad) * 2
+          },
+          durationMs
+        )
+        .easing(window.TWEEN.Easing.Linear.None)
         .onUpdate(() => {
-          this.camera.position.set(startPos.x, startPos.y, startPos.z);
-          this.controls.target.set(startPos.tx, startPos.ty, startPos.tz);
+          this.setUserPosition(startState.x, startState.z, headingDeg);
+          this.camera.position.set(startState.camX, startState.camY, startState.camZ);
+          this.controls.target.set(startState.tarX, startState.tarY, startState.tarZ);
         })
         .onComplete(() => {
           currentIndex++;
@@ -516,56 +579,79 @@ export class Viewer3D {
         .start();
     };
 
-    // First jump camera near start
-    const first = waypoints[0];
-    const second = waypoints[1];
-    this.flyTo(
-      { x: first.x, y: (first.y || 0.0) + 1.6, z: first.z },
-      { x: second.x, y: (second.y || 0.0) + 1.2, z: second.z },
-      600
-    );
-    setTimeout(stepToNext, 650);
+    // First jump user to start waypoint
+    this.setUserPosition(waypoints[0].x, waypoints[0].z);
+    stepToNext();
   }
 
-  stopWalkTour() {
-    this.tourActive = false;
-    if (this.tourTween) {
-      this.tourTween.stop();
-      this.tourTween = null;
+  stopNavigation() {
+    this.navigationActive = false;
+    if (this.navTween) {
+      this.navTween.stop();
+      this.navTween = null;
     }
   }
 
-  flyTo(position, target, duration = 800) {
+  renderObstacles(obstacles) {
+    while (this.obstacleGroup.children.length > 0) {
+      this.obstacleGroup.remove(this.obstacleGroup.children[0]);
+    }
+    if (!obstacles || obstacles.length === 0) return;
+
+    obstacles.forEach((obs) => {
+      const group = new THREE.Group();
+      group.position.set(obs.x, 0.0, obs.z);
+
+      // Warning Red/Amber Cylinder
+      const cylGeo = new THREE.CylinderGeometry(obs.radius, obs.radius, 1.0, 24);
+      const cylMat = new THREE.MeshBasicMaterial({
+        color: 0xea4335,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      });
+      const cyl = new THREE.Mesh(cylGeo, cylMat);
+      cyl.position.y = 0.5;
+      group.add(cyl);
+
+      // Caution Ring
+      const ringGeo = new THREE.RingGeometry(obs.radius * 0.88, obs.radius, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xfbbc04, side: THREE.DoubleSide });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.04;
+      group.add(ring);
+
+      const sprite = this._createTextSprite(`⚠️ ${obs.name}`, 0xea4335);
+      sprite.position.y = 1.3;
+      group.add(sprite);
+
+      this.obstacleGroup.add(group);
+    });
+  }
+
+  flyTo(position, target, duration = 750) {
     if (!window.TWEEN) {
       this.camera.position.set(position.x, position.y, position.z);
       this.controls.target.set(target.x, target.y, target.z);
       return;
     }
 
-    const startPos = {
-      x: this.camera.position.x,
-      y: this.camera.position.y,
-      z: this.camera.position.z,
+    const start = {
+      cx: this.camera.position.x,
+      cy: this.camera.position.y,
+      cz: this.camera.position.z,
       tx: this.controls.target.x,
       ty: this.controls.target.y,
       tz: this.controls.target.z
     };
 
-    const targetPos = {
-      x: position.x,
-      y: position.y,
-      z: position.z,
-      tx: target.x,
-      ty: target.y,
-      tz: target.z
-    };
-
-    new window.TWEEN.Tween(startPos)
-      .to(targetPos, duration)
+    new window.TWEEN.Tween(start)
+      .to({ cx: position.x, cy: position.y, cz: position.z, tx: target.x, ty: target.y, tz: target.z }, duration)
       .easing(window.TWEEN.Easing.Cubic.Out)
       .onUpdate(() => {
-        this.camera.position.set(startPos.x, startPos.y, startPos.z);
-        this.controls.target.set(startPos.tx, startPos.ty, startPos.tz);
+        this.camera.position.set(start.cx, start.cy, start.cz);
+        this.controls.target.set(start.tx, start.ty, start.tz);
       })
       .start();
   }
@@ -574,21 +660,25 @@ export class Viewer3D {
     this.isTopDown = !this.isTopDown;
     const target = this.controls.target.clone();
     if (this.isTopDown) {
-      this.flyTo({ x: target.x, y: target.y + 25, z: target.z + 0.01 }, target, 700);
+      this.flyTo({ x: target.x, y: target.y + 24, z: target.z + 0.01 }, target, 650);
     } else {
-      this.flyTo({ x: target.x, y: target.y + 8, z: target.z + 16 }, target, 700);
+      this.flyTo({ x: target.x, y: target.y + 10, z: target.z + 16 }, target, 650);
     }
     return this.isTopDown;
   }
 
-  resetCamera() {
-    if (!this.activeVenue?.spawn_point) return;
-    const spawn = this.activeVenue.spawn_point;
+  recenterOnUser() {
     this.flyTo(
-      { x: spawn.position.x, y: spawn.position.y + 2, z: spawn.position.z + 5 },
-      spawn.target || { x: 0, y: 0, z: 0 },
-      700
+      { x: this.userPos.x, y: 7, z: this.userPos.z + 8 },
+      { x: this.userPos.x, y: 0.2, z: this.userPos.z },
+      650
     );
+  }
+
+  resetNorth() {
+    const target = this.controls.target.clone();
+    const dist = this.camera.position.distanceTo(target);
+    this.flyTo({ x: target.x, y: target.y + 8, z: target.z + dist * 0.8 }, target, 600);
   }
 
   toggleNavmeshOverlay(show, venueId, debugMapUrl) {
@@ -599,13 +689,9 @@ export class Viewer3D {
       }
       return;
     }
-
     if (this.navmeshMesh) return;
 
-    const bounds = this.activeVenue?.bounds || {
-      min: { x: -10, y: 0, z: -7.5 },
-      max: { x: 10, y: 3, z: 7.5 }
-    };
+    const bounds = this.activeVenue?.bounds || { min: { x: -10, y: 0, z: -7.5 }, max: { x: 10, y: 3, z: 7.5 } };
     const sizeX = Math.abs(bounds.max.x - bounds.min.x);
     const sizeZ = Math.abs(bounds.max.z - bounds.min.z);
     const centerX = (bounds.min.x + bounds.max.x) / 2;
@@ -615,12 +701,7 @@ export class Viewer3D {
     textureLoader.load(debugMapUrl, (texture) => {
       texture.magFilter = THREE.NearestFilter;
       const planeGeo = new THREE.PlaneGeometry(sizeX, sizeZ);
-      const planeMat = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.6,
-        side: THREE.DoubleSide
-      });
+      const planeMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
       this.navmeshMesh = new THREE.Mesh(planeGeo, planeMat);
       this.navmeshMesh.rotation.x = -Math.PI / 2;
       this.navmeshMesh.position.set(centerX, bounds.min.y + 0.02, centerZ);
@@ -628,120 +709,35 @@ export class Viewer3D {
     });
   }
 
-  renderObstacles(obstacles) {
-    while (this.obstacleGroup.children.length > 0) {
-      const child = this.obstacleGroup.children[0];
-      this.obstacleGroup.remove(child);
-    }
-
-    if (!obstacles || obstacles.length === 0) return;
-
-    obstacles.forEach((obs) => {
-      const group = new THREE.Group();
-      group.position.set(obs.x, 0.0, obs.z);
-
-      // 1. Translucent Hazard Cylinder
-      const cylGeo = new THREE.CylinderGeometry(obs.radius, obs.radius, 1.2, 24);
-      const cylMat = new THREE.MeshBasicMaterial({
-        color: 0xef4444,
-        transparent: true,
-        opacity: 0.35,
-        side: THREE.DoubleSide
-      });
-      const cylMesh = new THREE.Mesh(cylGeo, cylMat);
-      cylMesh.position.y = 0.6;
-      group.add(cylMesh);
-
-      // 2. Wireframe Warning
-      const wireMat = new THREE.MeshBasicMaterial({
-        color: 0xf59e0b,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.5
-      });
-      const wireMesh = new THREE.Mesh(cylGeo, wireMat);
-      wireMesh.position.y = 0.6;
-      group.add(wireMesh);
-
-      // 3. Floor Caution Ring
-      const ringGeo = new THREE.RingGeometry(obs.radius * 0.88, obs.radius, 24);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xef4444,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.85
-      });
-      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-      ringMesh.rotation.x = -Math.PI / 2;
-      ringMesh.position.y = 0.04;
-      ringMesh.name = 'hazardRing';
-      group.add(ringMesh);
-
-      // 4. Floating Warning Tag
-      const sprite = this._createTextSprite(`⚠️ ${obs.name}`, 0xef4444);
-      sprite.position.y = 1.4;
-      group.add(sprite);
-
-      this.obstacleGroup.add(group);
-    });
-  }
-
   clearAll() {
     this.clearPath();
-    while (this.venueGroup.children.length > 0) {
-      this.venueGroup.remove(this.venueGroup.children[0]);
-    }
-    while (this.poiGroup.children.length > 0) {
-      this.poiGroup.remove(this.poiGroup.children[0]);
-    }
-    while (this.obstacleGroup.children.length > 0) {
-      this.obstacleGroup.remove(this.obstacleGroup.children[0]);
-    }
+    while (this.venueGroup.children.length > 0) this.venueGroup.remove(this.venueGroup.children[0]);
+    while (this.poiGroup.children.length > 0) this.poiGroup.remove(this.poiGroup.children[0]);
+    while (this.obstacleGroup.children.length > 0) this.obstacleGroup.remove(this.obstacleGroup.children[0]);
     this.navmeshMesh = null;
   }
 
   _animate(time) {
     requestAnimationFrame((t) => this._animate(t));
+    if (window.TWEEN) window.TWEEN.update(time);
 
-    // Update TWEEN
-    if (window.TWEEN) {
-      window.TWEEN.update(time);
+    // Pulse radar ring on Blue Dot
+    const pulseRing = this.userDotGroup.getObjectByName('userPulseRing');
+    if (pulseRing) {
+      const s = 1.0 + Math.sin(time * 0.003) * 0.35;
+      pulseRing.scale.set(s, s, 1);
     }
 
-    // Gentle floating animation on POI pins
-    const tSec = time * 0.002;
-    this.poiGroup.children.forEach((marker, idx) => {
-      const pin = marker.getObjectByName('pinMesh');
-      const ring = marker.getObjectByName('ringMesh');
-      if (pin) {
-        pin.position.y = 0.5 + Math.sin(tSec + idx) * 0.08;
-        pin.rotation.y += 0.015;
+    // Rotate compass needle based on camera azimuthal angle
+    if (this.controls) {
+      const rotY = this.controls.getAzimuthalAngle();
+      const needle = document.getElementById('compass-needle');
+      if (needle) {
+        needle.style.transform = `rotate(${-rotY}rad)`;
       }
-      if (ring) {
-        const s = 1.0 + Math.sin(tSec * 1.5 + idx) * 0.15;
-        ring.scale.set(s, s, 1);
-      }
-    });
-
-    // Pulse hazard obstacles
-    this.obstacleGroup.children.forEach((obsGroup, idx) => {
-      const ring = obsGroup.getObjectByName('hazardRing');
-      if (ring) {
-        const s = 1.0 + Math.sin(tSec * 2.5 + idx) * 0.08;
-        ring.scale.set(s, s, 1);
-      }
-    });
+    }
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
-
-    // FPS Telemetry
-    this._frameCount++;
-    const now = performance.now();
-    if (now - this._lastFpsUpdate >= 1000) {
-      this.fps = Math.round((this._frameCount * 1000) / (now - this._lastFpsUpdate));
-      this._frameCount = 0;
-      this._lastFpsUpdate = now;
-    }
   }
 }

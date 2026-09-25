@@ -1,5 +1,5 @@
 /**
- * NammaSpace 3D - Main Application Entrypoint
+ * NammaSpace 3D — Google Maps Indoor Application Entrypoint
  */
 
 import { api } from './api.js';
@@ -17,54 +17,52 @@ class App {
     this.pois = [];
     this.activeRoute = null;
     this.navmeshVisible = false;
+    this.currentFloor = 0;
 
     this._setupEventHandlers();
   }
 
   async init() {
-    this.ui.showLoading('Connecting to NammaSpace Backend...', 'Checking spatial gateway...', 25);
+    this.ui.showLoading('Locating Indoor Space...', 'Connecting to spatial twin engine...', 25);
 
     try {
-      // 1. Health Check
-      const health = await api.checkHealth();
-      this.ui.setBackendStatus(true, api.lastLatencyMs);
+      // 1. Health check
+      await api.checkHealth();
 
-      // 2. Fetch Venues
-      this.ui.showLoading('Loading Registered Venues...', 'Reading venue configurations...', 50);
+      // 2. Fetch venues
+      this.ui.showLoading('Loading Registered Venues...', 'Fetching 3D floor configurations...', 50);
       const venues = await api.listVenues();
       this.ui.populateVenues(venues, this.currentVenueId);
 
-      // 3. Load Default Venue
+      // 3. Load default venue
       await this.loadVenue(this.currentVenueId);
-      this.ui.showToast(`Connected to NammaSpace Digital Twin (${health.app})`, 'success');
+      this.ui.showToast('NammaSpace Indoor Maps Ready 📍', 'success');
     } catch (err) {
       console.error('Initialization failed:', err);
-      this.ui.setBackendStatus(false);
-      this.ui.showToast(`Failed to connect to backend: ${err.message}`, 'error');
-      // Still load fallback sample lab if offline
+      this.ui.showToast(`Backend connection notice: ${err.message}`, 'error');
+      // Load fallback venue geometry
       await this.loadVenue(this.currentVenueId);
     } finally {
       this.ui.hideLoading();
-      this._startTelemetryTicker();
     }
   }
 
   async loadVenue(venueId) {
     this.currentVenueId = venueId;
-    this.ui.showLoading(`Loading Venue: ${venueId}`, 'Fetching 3D geometry & spatial index...', 40);
+    this.ui.showLoading(`Loading ${venueId}`, 'Loading 3D mesh & spatial graph...', 40);
 
     try {
-      // 1. Get Venue Metadata
+      // 1. Venue metadata
       const venue = await api.getVenue(venueId);
       this.currentVenueData = venue;
 
-      // 2. Load 3D Asset
-      this.ui.showLoading(`Streaming 3D Mesh...`, 'Streaming binary GLB model...', 70);
+      // 2. 3D Asset
+      this.ui.showLoading('Rendering 3D Twin...', 'Loading geometry & lighting...', 70);
       const modelUrl = api.getModelUrl(venueId, venue.model_file || 'models/sample_room.glb');
       await this.viewer.loadVenue(venue, modelUrl);
 
       // 3. Load POIs
-      this.ui.showLoading(`Fetching POIs...`, 'Building in-memory KD-Tree spatial pins...', 85);
+      this.ui.showLoading('Pinning Indoor POIs...', 'Rendering Google Maps indoor markers...', 85);
       const pois = await api.getPOIs(venueId);
       this.pois = pois;
       this.viewer.renderPOIs(pois);
@@ -73,81 +71,117 @@ class App {
       // 4. Load Dynamic Obstacles
       const obstacles = await api.listObstacles(venueId);
       this.viewer.renderObstacles(obstacles);
-      this.ui.updateObstacleBadge(obstacles.length);
 
-      // 5. Update HUD
-      if (venue.bounds?.dimensions) {
-        this.ui.updateHUD(this.viewer.fps, venue.bounds.dimensions);
-      }
-
-      this.ui.clearSearch?.();
-      this.ui.hideRouteSummary();
+      // Reset state
+      this.ui.hideTripBar();
+      this.ui.hidePlaceSheet();
+      this.viewer.clearPath();
       this.activeRoute = null;
-      this.navmeshVisible = false;
     } catch (err) {
       console.error(`Error loading venue ${venueId}:`, err);
-      this.ui.showToast(`Failed to load venue '${venueId}': ${err.message}`, 'error');
+      this.ui.showToast(`Failed to load venue: ${err.message}`, 'error');
     } finally {
       this.ui.hideLoading();
     }
   }
 
   _setupEventHandlers() {
-    // Venue Switching
-    this.ui.venueSelect.addEventListener('change', async (e) => {
+    // 1. Venue Selector
+    this.ui.venueSelect?.addEventListener('change', async (e) => {
       const selected = e.target.value;
       if (selected && selected !== this.currentVenueId) {
         await this.loadVenue(selected);
       }
     });
 
-    // 3D POI Hover & Click
+    // 2. 3D Hover & Click Handlers
     this.viewer.onPOIHover = (poi, clientX, clientY) => {
       this.ui.showHoverTooltip(poi, clientX, clientY);
     };
 
     this.viewer.onPOIClick = (poi) => {
-      this.ui.showPOIDetail(
+      this.ui.showPlaceSheet(
         poi,
-        (targetPoi) => this._triggerRoute(null, targetPoi.id),
+        // On Directions Click:
+        (destPoi) => {
+          this.ui.navGoalSelect.value = destPoi.id;
+          this.ui.navStartSelect.value = 'user_pos';
+          this._triggerRoute();
+        },
+        // On Set Start Click:
         (startPoi) => {
           this.ui.navStartSelect.value = startPoi.id;
         },
-        (focusPoi) => this.viewer.selectPOI(focusPoi.id)
+        // On Look At Click:
+        (focusPoi) => {
+          this.viewer.selectPOI(focusPoi.id);
+        }
       );
     };
 
-    // Typo-Tolerant Search with Debounce
-    this.ui.searchInput.addEventListener('input', (e) => {
+    // 3. Floor Click -> Move Blue Dot
+    this.viewer.onFloorClick = (pt) => {
+      this.ui.showToast(`User location updated: (${pt.x.toFixed(1)}m, ${pt.z.toFixed(1)}m)`, 'info');
+      // If start is set to user_pos and active route exists, auto-recalculate
+      if (this.ui.navStartSelect.value === 'user_pos' && this.ui.navGoalSelect.value) {
+        this._triggerRoute();
+      }
+    };
+
+    // 4. Category Exploration Chips (Desks, Coffee, Lab, First Aid, Exits)
+    this.ui.categoryChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const category = chip.getAttribute('data-category');
+        this.ui.categoryChips.forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+
+        const matching = this.pois.filter((p) => p.category === category);
+        if (matching.length > 0) {
+          this.ui.showSearchResults(
+            matching.map((p) => ({
+              id: p.id,
+              name: p.name,
+              category: p.category,
+              floor: p.floor,
+              score: 100,
+              matched_field: 'category'
+            })),
+            (selectedItem) => {
+              const fullPOI = this.pois.find((p) => p.id === selectedItem.id);
+              if (fullPOI) {
+                this.viewer.selectPOI(fullPOI.id);
+                this.viewer.onPOIClick(fullPOI);
+              }
+            }
+          );
+          // Fly to first match
+          this.viewer.selectPOI(matching[0].id);
+          this.ui.showToast(`Found ${matching.length} location(s) in '${category}'`, 'info');
+        } else {
+          this.ui.showToast(`No locations found in '${category}'`, 'info');
+        }
+      });
+    });
+
+    // 5. Typo-Tolerant Search
+    this.ui.searchInput?.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (!q) {
-        this.ui.searchClearBtn.classList.add('hidden');
+        this.ui.searchClearBtn?.classList.add('hidden');
         this.ui.hideSearchResults();
         return;
       }
-      this.ui.searchClearBtn.classList.remove('hidden');
+      this.ui.searchClearBtn?.classList.remove('hidden');
 
       clearTimeout(this.ui.searchDebounceTimer);
       this.ui.searchDebounceTimer = setTimeout(async () => {
         try {
-          const userPos = {
-            x: this.viewer.camera.position.x,
-            z: this.viewer.camera.position.z
-          };
+          const userPos = { x: this.viewer.userPos.x, z: this.viewer.userPos.z };
           const data = await api.searchPOIs(this.currentVenueId, q, userPos);
-          this.ui.setBackendStatus(true, api.lastLatencyMs);
-
           this.ui.showSearchResults(data.results, (selectedItem) => {
-            this.viewer.selectPOI(selectedItem.id);
             const fullPOI = this.pois.find((p) => p.id === selectedItem.id) || selectedItem;
-            this.ui.showPOIDetail(
-              fullPOI,
-              (target) => this._triggerRoute(null, target.id),
-              (start) => {
-                this.ui.navStartSelect.value = start.id;
-              },
-              (focus) => this.viewer.selectPOI(focus.id)
-            );
+            this.viewer.selectPOI(fullPOI.id);
+            this.viewer.onPOIClick(fullPOI);
           });
         } catch (err) {
           console.error('Search error:', err);
@@ -155,70 +189,125 @@ class App {
       }, 150);
     });
 
-    // Calculate Navigation Route
-    this.ui.btnCalculateRoute.addEventListener('click', async () => {
-      const start = this.ui.navStartSelect.value;
-      const goal = this.ui.navGoalSelect.value;
-      if (!start || !goal) {
-        this.ui.showToast('Please select both Origin and Destination.', 'error');
-        return;
-      }
-      if (start === goal) {
-        this.ui.showToast('Origin and Destination cannot be identical.', 'error');
-        return;
-      }
-      await this._triggerRoute(start, goal);
+    // 6. Calculate Route Button (in Directions Panel)
+    this.ui.btnCalculateRoute?.addEventListener('click', async () => {
+      await this._triggerRoute();
     });
 
-    // Use Camera Position as Start
-    this.ui.btnUseCameraStart?.addEventListener('click', () => {
-      const camPos = this.viewer.camera.position;
-      const customStart = `cam:${camPos.x.toFixed(2)},${camPos.z.toFixed(2)}`;
-      // Check if custom option already in select
-      let opt = Array.from(this.ui.navStartSelect.options).find((o) => o.value.startsWith('cam:'));
-      if (!opt) {
-        opt = document.createElement('option');
-        this.ui.navStartSelect.insertBefore(opt, this.ui.navStartSelect.children[1]);
-      }
-      opt.value = `${camPos.x.toFixed(2)},${camPos.z.toFixed(2)}`;
-      opt.textContent = `📍 Camera Eye (${camPos.x.toFixed(1)}m, ${camPos.z.toFixed(1)}m)`;
-      opt.selected = true;
-      this.ui.showToast('Used current 3D camera coordinates as route start.', 'success');
-    });
-
-    // Start Walkthrough Tour with Real-time Direction Step Highlighting
-    this.ui.btnStartTour.addEventListener('click', () => {
+    // 7. Start / Pause Walking Navigation (Google Maps Turn-by-Turn Experience)
+    this.ui.btnStartNavigation?.addEventListener('click', () => {
       if (!this.activeRoute?.waypoints) return;
-      this.viewer.startWalkTour(
-        this.activeRoute.waypoints,
-        () => {
-          this.ui.showToast('Walkthrough tour completed!', 'success');
-        },
-        (currentIndex) => {
-          this.ui.highlightActiveDirectionStep(currentIndex);
-        }
+
+      if (this.viewer.navigationActive) {
+        // Pause/stop
+        this.viewer.stopNavigation();
+        this.ui.setNavigationActive(false);
+        this.ui.hideNavigationBanner();
+        this.ui.showToast('Indoor navigation paused.', 'info');
+      } else {
+        // Start live navigation
+        this.ui.setNavigationActive(true);
+        this.ui.directionsPanel?.classList.add('hidden'); // Minimize panel for full 3D view
+        this.ui.hidePlaceSheet();
+
+        const waypoints = this.activeRoute.waypoints;
+        const directions = this.activeRoute.directions || [];
+
+        this.viewer.startNavigation(
+          waypoints,
+          (wpIndex) => {
+            // Find current direction step matching or closest to this waypoint index
+            const stepIdx = directions.findIndex((d) => d.waypoint_index >= wpIndex);
+            const currentStep = directions[stepIdx >= 0 ? stepIdx : directions.length - 1];
+            const nextStep = directions[stepIdx + 1] || null;
+
+            if (currentStep) {
+              this.ui.showNavigationBanner(currentStep, nextStep);
+              this.ui.highlightActiveDirectionStep(currentStep.waypoint_index);
+            }
+          },
+          () => {
+            // Reached destination
+            this.ui.setNavigationActive(false);
+            this.ui.showNavigationBanner(
+              { distance_meters: 0, instruction: 'You have arrived at your indoor destination! 📍' },
+              null
+            );
+            this.ui.showToast('You have arrived at your indoor destination!', 'success');
+          }
+        );
+      }
+    });
+
+    // 8. Exit Route Button
+    this.ui.btnExitNavigation?.addEventListener('click', () => {
+      this.viewer.stopNavigation();
+      this.viewer.clearPath();
+      this.ui.hideTripBar();
+      this.ui.hideNavigationBanner();
+      this.ui.directionsStepContainer?.classList.add('hidden');
+      this.activeRoute = null;
+      this.ui.showToast('Exited indoor navigation.', 'info');
+    });
+
+    // 9. Floating Control: Re-center on User Blue Dot
+    this.ui.btnRecenterUser?.addEventListener('click', () => {
+      this.viewer.recenterOnUser();
+      this.ui.showToast('Re-centered on your indoor position.', 'info');
+    });
+
+    // 10. Floating Control: Compass Re-orient North
+    this.ui.btnCompass?.addEventListener('click', () => {
+      this.viewer.resetNorth();
+      this.ui.showToast('Oriented North.', 'info');
+    });
+
+    // 11. Floating Control: 2D / 3D Tilt Toggle
+    this.ui.btnToggleView?.addEventListener('click', () => {
+      const isTopDown = this.viewer.toggleViewMode();
+      this.ui.viewModeLabel.textContent = isTopDown ? '2D' : '3D';
+      this.ui.showToast(isTopDown ? 'Switched to 2D Top-Down View' : 'Switched to 3D Perspective View', 'info');
+    });
+
+    // 12. Floating Control: Navmesh Toggle
+    this.ui.btnToggleNavmesh?.addEventListener('click', () => {
+      this.navmeshVisible = !this.navmeshVisible;
+      const debugUrl = api.getNavmeshDebugUrl(this.currentVenueId);
+      this.viewer.toggleNavmeshOverlay(this.navmeshVisible, this.currentVenueId, debugUrl);
+      this.ui.btnToggleNavmesh.classList.toggle('active', this.navmeshVisible);
+      this.ui.showToast(
+        this.navmeshVisible ? 'Floor walkability grid overlay visible.' : 'Walkability grid overlay hidden.',
+        'info'
       );
     });
 
-    // Dynamic Hazard Injection (Chemical Spill)
+    // 13. Floor Level Switching (L1 / L2)
+    this.ui.floorButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.ui.floorButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const floor = parseInt(btn.getAttribute('data-floor') || '0', 10);
+        this.currentFloor = floor;
+        this.ui.showToast(`Switched to Floor ${floor === 1 ? 'L2' : 'L1'}`, 'info');
+      });
+    });
+
+    // 14. Dynamic Hazard Injection (Simulate Spill / Reroute)
     this.ui.btnInjectSpill?.addEventListener('click', async () => {
       let obsX = 0.0;
-      let obsZ = 0.0;
+      let obsZ = 0.5;
 
-      // If active route exists, place hazard midway along the route!
+      // Place hazard directly along current active route if available!
       if (this.activeRoute?.waypoints?.length > 2) {
         const midIdx = Math.floor(this.activeRoute.waypoints.length / 2);
         const midWp = this.activeRoute.waypoints[midIdx];
         obsX = midWp.x;
         obsZ = midWp.z;
-      } else {
-        obsX = 1.0;
-        obsZ = 0.5;
       }
 
       try {
         await api.createObstacle(this.currentVenueId, {
-          name: 'Caution: Liquid Chemical Spill',
+          name: 'Liquid Floor Spill Hazard',
           x: obsX,
           z: obsZ,
           radius: 1.1
@@ -226,117 +315,62 @@ class App {
 
         const obstacles = await api.listObstacles(this.currentVenueId);
         this.viewer.renderObstacles(obstacles);
-        this.ui.updateObstacleBadge(obstacles.length);
+        this.ui.showToast('⚠️ Obstacle placed! Recalculating path...', 'info');
 
-        this.ui.showToast('⚠️ Dynamic hazard placed! A* path recalculating...', 'info');
-
-        // Automatically recalculate current route if start and goal selected
-        if (this.ui.navStartSelect.value && this.ui.navGoalSelect.value) {
+        // Automatically recalculate route with active hazard avoidance
+        if (this.ui.navGoalSelect.value) {
           await this._triggerRoute();
         }
       } catch (err) {
-        this.ui.showToast(`Failed to inject hazard: ${err.message}`, 'error');
+        this.ui.showToast(`Failed to place hazard: ${err.message}`, 'error');
       }
-    });
-
-    // Clear Hazards
-    this.ui.btnClearHazards?.addEventListener('click', async () => {
-      try {
-        await api.clearObstacles(this.currentVenueId);
-        this.viewer.renderObstacles([]);
-        this.ui.updateObstacleBadge(0);
-        this.ui.showToast('Cleared all dynamic hazards. Path restored to optimal.', 'success');
-
-        if (this.ui.navStartSelect.value && this.ui.navGoalSelect.value) {
-          await this._triggerRoute();
-        }
-      } catch (err) {
-        this.ui.showToast(`Failed to clear hazards: ${err.message}`, 'error');
-      }
-    });
-
-    // Clear Route
-    this.ui.btnClearRoute.addEventListener('click', () => {
-      this.viewer.clearPath();
-      this.ui.hideRouteSummary();
-      this.activeRoute = null;
-    });
-
-    // Toggle 3D / Top-Down View
-    this.ui.btnToggleView.addEventListener('click', () => {
-      const isTopDown = this.viewer.toggleViewMode();
-      this.ui.btnToggleView.querySelector('.btn-text').textContent = isTopDown ? '3D View' : 'Top-Down';
-    });
-
-    // Toggle Navmesh Overlay
-    this.ui.btnToggleNavmesh.addEventListener('click', () => {
-      this.navmeshVisible = !this.navmeshVisible;
-      const debugUrl = api.getNavmeshDebugUrl(this.currentVenueId);
-      this.viewer.toggleNavmeshOverlay(this.navmeshVisible, this.currentVenueId, debugUrl);
-      this.ui.btnToggleNavmesh.classList.toggle('nav-btn-accent', this.navmeshVisible);
-      this.ui.showToast(
-        this.navmeshVisible
-          ? 'Occupancy grid & clearance overlay enabled.'
-          : 'Occupancy grid overlay hidden.',
-        'info'
-      );
-    });
-
-    // Reset Camera
-    this.ui.btnResetCamera.addEventListener('click', () => {
-      this.viewer.resetCamera();
     });
   }
 
-  async _triggerRoute(startId, goalId) {
-    const start = startId || this.ui.navStartSelect.value;
-    const goal = goalId || this.ui.navGoalSelect.value;
-    const smooth = this.ui.navSmoothToggle.checked;
+  async _triggerRoute() {
+    const rawStart = this.ui.navStartSelect.value;
+    const goal = this.ui.navGoalSelect.value;
 
-    if (!start || !goal) return;
+    if (!goal) {
+      this.ui.showToast('Please select a destination.', 'error');
+      return;
+    }
+
+    let startPayload;
+    if (!rawStart || rawStart === 'user_pos') {
+      startPayload = { x: this.viewer.userPos.x, y: 0.1, z: this.viewer.userPos.z };
+    } else {
+      startPayload = rawStart;
+    }
 
     this.ui.btnCalculateRoute.disabled = true;
-    this.ui.btnCalculateRoute.innerHTML = '<span>Calculating A* Path...</span>';
+    this.ui.btnCalculateRoute.innerHTML = '<span>Finding Best Indoor Route...</span>';
 
     try {
-      const data = await api.navigate(this.currentVenueId, start, goal, smooth);
+      const data = await api.navigate(this.currentVenueId, startPayload, goal, true);
       this.activeRoute = data;
-      this.ui.setBackendStatus(true, api.lastLatencyMs);
 
-      // Render glowing 3D polyline
+      // Render 3D Google Maps vibrant blue route line and 📍 destination pin
       this.viewer.renderPath(data.waypoints);
 
-      // Show summary in drawer
+      // Display summary in directions accordion and bottom trip bar
       this.ui.showRouteSummary(data);
+
       this.ui.showToast(
-        `Path found! Distance: ${data.total_distance_meters.toFixed(1)}m in ${data.execution_time_ms.toFixed(1)}ms`,
+        `Route calculated: ${data.total_distance_meters.toFixed(1)}m in ${data.estimated_walking_time_seconds.toFixed(0)}s`,
         'success'
       );
     } catch (err) {
-      console.error('Navigation error:', err);
-      this.ui.showToast(`Pathfinding failed: ${err.message}`, 'error');
+      console.error('Route error:', err);
+      this.ui.showToast(`Pathfinding error: ${err.message}`, 'error');
     } finally {
       this.ui.btnCalculateRoute.disabled = false;
-      this.ui.btnCalculateRoute.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="6" y1="3" x2="6" y2="15"></line>
-          <circle cx="18" cy="6" r="3"></circle>
-          <circle cx="6" cy="18" r="3"></circle>
-          <path d="M18 9a9 9 0 0 1-9 9"></path>
-        </svg>
-        <span>Compute Optimal Path</span>
-      `;
+      this.ui.btnCalculateRoute.innerHTML = '<span>Find Indoor Route</span>';
     }
-  }
-
-  _startTelemetryTicker() {
-    setInterval(() => {
-      this.ui.updateHUD(this.viewer.fps);
-    }, 1000);
   }
 }
 
-// Start app on DOMContentLoaded
+// Initialize on DOM load
 window.addEventListener('DOMContentLoaded', () => {
   const app = new App();
   app.init();

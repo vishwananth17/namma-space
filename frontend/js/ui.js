@@ -1,110 +1,109 @@
 /**
- * NammaSpace 3D - User Interface Controller
+ * NammaSpace 3D — Google Maps Indoor User Interface Controller
  */
 
 export class UIController {
   constructor() {
-    // Elements
-    this.venueSelect = document.getElementById('venue-select');
-    this.backendStatusPill = document.getElementById('backend-status');
-    this.backendStatusText = document.getElementById('backend-status-text');
-    this.backendLatency = document.getElementById('backend-latency');
-
+    // Top Bar & Search
     this.searchInput = document.getElementById('search-input');
     this.searchClearBtn = document.getElementById('search-clear-btn');
     this.searchResultsDropdown = document.getElementById('search-results-dropdown');
+    this.btnOpenDirections = document.getElementById('btn-open-directions');
+    this.categoryChips = document.querySelectorAll('.gmaps-chip');
 
-    this.navDrawer = document.getElementById('nav-drawer');
-    this.drawerToggleBtn = document.getElementById('drawer-toggle-btn');
+    // Directions Panel
+    this.directionsPanel = document.getElementById('directions-panel');
+    this.btnCloseDirections = document.getElementById('btn-close-directions');
     this.navStartSelect = document.getElementById('nav-start-select');
     this.navGoalSelect = document.getElementById('nav-goal-select');
     this.btnSwapPoints = document.getElementById('btn-swap-points');
-    this.btnUseCameraStart = document.getElementById('btn-use-camera-start');
-    this.navSmoothToggle = document.getElementById('nav-smooth-toggle');
     this.btnCalculateRoute = document.getElementById('btn-calculate-route');
-
-    this.routeSummary = document.getElementById('route-summary');
-    this.metricDistance = document.getElementById('metric-distance');
-    this.metricTime = document.getElementById('metric-time');
-    this.metricLatency = document.getElementById('metric-latency');
-    this.metricWaypoints = document.getElementById('metric-waypoints');
-    this.btnStartTour = document.getElementById('btn-start-tour');
-    this.btnClearRoute = document.getElementById('btn-clear-route');
-    this.waypointsList = document.getElementById('waypoints-list');
-    this.quickChipsContainer = document.getElementById('quick-poi-chips');
-
+    this.directionsStepContainer = document.getElementById('directions-step-container');
+    this.routeTimeVal = document.getElementById('route-time-val');
+    this.routeDistVal = document.getElementById('route-dist-val');
+    this.routeLatencyBadge = document.getElementById('route-latency-badge');
     this.routeRerouteAlert = document.getElementById('route-reroute-alert');
-    this.routeRerouteText = document.getElementById('route-reroute-text');
-    this.directionsCount = document.getElementById('directions-count');
     this.directionsList = document.getElementById('directions-list');
-    this.btnInjectSpill = document.getElementById('btn-inject-spill');
-    this.btnClearHazards = document.getElementById('btn-clear-hazards');
-    this.obstacleCountBadge = document.getElementById('obstacle-count-badge');
 
+    // Active Navigation Green Banner (Google Maps Standard)
+    this.activeNavBanner = document.getElementById('active-navigation-banner');
+    this.navBannerIcon = document.getElementById('nav-banner-icon');
+    this.navBannerDistance = document.getElementById('nav-banner-distance');
+    this.navBannerInstruction = document.getElementById('nav-banner-instruction');
+    this.navBannerNext = document.getElementById('nav-banner-next');
+    this.btnToggleVoice = document.getElementById('btn-toggle-voice');
+    this.voiceIcon = document.getElementById('voice-icon');
+    this.voiceEnabled = true;
+
+    // Bottom Trip Bar
+    this.gmapsTripBar = document.getElementById('gmaps-trip-bar');
+    this.tripTime = document.getElementById('trip-time');
+    this.tripDistance = document.getElementById('trip-distance');
+    this.tripStepsCount = document.getElementById('trip-steps-count');
+    this.btnStartNavigation = document.getElementById('btn-start-navigation');
+    this.navBtnText = document.getElementById('nav-btn-text');
+    this.btnExitNavigation = document.getElementById('btn-exit-navigation');
+
+    // Place Details Sheet
+    this.gmapsPlaceSheet = document.getElementById('gmaps-place-sheet');
+    this.btnClosePlaceSheet = document.getElementById('btn-close-place-sheet');
+    this.placeCategory = document.getElementById('place-category');
+    this.placeTitle = document.getElementById('place-title');
+    this.placeDescription = document.getElementById('place-description');
+    this.placeCoords = document.getElementById('place-coords');
+    this.placeFloor = document.getElementById('place-floor');
+    this.placeTags = document.getElementById('place-tags');
+    this.btnPlaceDirections = document.getElementById('btn-place-directions');
+    this.btnPlaceSetStart = document.getElementById('btn-place-set-start');
+    this.btnPlaceFocus = document.getElementById('btn-place-focus');
+
+    // Floating Controls
+    this.venueSelect = document.getElementById('venue-select');
+    this.btnCompass = document.getElementById('btn-compass');
+    this.compassNeedle = document.getElementById('compass-needle');
+    this.btnToggleView = document.getElementById('btn-toggle-view');
+    this.viewModeLabel = document.getElementById('view-mode-label');
+    this.btnToggleNavmesh = document.getElementById('btn-toggle-navmesh');
+    this.btnRecenterUser = document.getElementById('btn-recenter-user');
+    this.floorButtons = document.querySelectorAll('.floor-btn');
+    this.btnInjectSpill = document.getElementById('btn-inject-spill');
+
+    // Tooltip, Loader & Toasts
     this.loadingOverlay = document.getElementById('loading-overlay');
     this.loaderStatus = document.getElementById('loader-status');
     this.loaderProgressFill = document.getElementById('loader-progress-fill');
-
     this.poiHoverTooltip = document.getElementById('poi-hover-tooltip');
     this.tooltipTitle = document.getElementById('tooltip-title');
     this.tooltipCategory = document.getElementById('tooltip-category');
-
-    this.poiDetailCard = document.getElementById('poi-detail-card');
-    this.btnClosePoiCard = document.getElementById('btn-close-poi-card');
-    this.poiCardCategory = document.getElementById('poi-card-category');
-    this.poiCardTitle = document.getElementById('poi-card-title');
-    this.poiCardDescription = document.getElementById('poi-card-description');
-    this.poiCardX = document.getElementById('poi-card-x');
-    this.poiCardY = document.getElementById('poi-card-y');
-    this.poiCardZ = document.getElementById('poi-card-z');
-    this.poiCardFloor = document.getElementById('poi-card-floor');
-    this.poiCardTags = document.getElementById('poi-card-tags');
-    this.btnPoiNavigateTo = document.getElementById('btn-poi-navigate-to');
-    this.btnPoiSetStart = document.getElementById('btn-poi-set-start');
-    this.btnPoiFocus = document.getElementById('btn-poi-focus');
-
-    this.hudFps = document.getElementById('hud-fps');
-    this.hudPoisCount = document.getElementById('hud-pois-count');
-    this.hudDimensions = document.getElementById('hud-dimensions');
-    this.hudApiLatency = document.getElementById('hud-api-latency');
     this.toastContainer = document.getElementById('toast-container');
 
-    this.btnToggleView = document.getElementById('btn-toggle-view');
-    this.btnToggleNavmesh = document.getElementById('btn-toggle-navmesh');
-    this.btnResetCamera = document.getElementById('btn-reset-camera');
-
+    // Internal state
     this.searchDebounceTimer = null;
     this.activePOI = null;
+    this.navigating = false;
+
     this._bindEvents();
   }
 
   _bindEvents() {
-    // Drawer Collapse Toggle
-    this.drawerToggleBtn?.addEventListener('click', () => {
-      this.navDrawer.classList.toggle('collapsed');
-      const isCollapsed = this.navDrawer.classList.contains('collapsed');
-      this.drawerToggleBtn.innerHTML = isCollapsed
-        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-    });
-
-    // Close POI Detail Card
-    this.btnClosePoiCard?.addEventListener('click', () => {
-      this.poiDetailCard.classList.add('hidden');
-    });
-
-    // Keyboard shortcut '/' to search
-    window.addEventListener('keydown', (e) => {
-      if (e.key === '/' && document.activeElement !== this.searchInput) {
-        e.preventDefault();
-        this.searchInput.focus();
-      } else if (e.key === 'Escape') {
-        this.hideSearchResults();
-        this.poiDetailCard.classList.add('hidden');
+    // Open / Close Directions Panel
+    this.btnOpenDirections?.addEventListener('click', () => {
+      this.directionsPanel?.classList.toggle('hidden');
+      if (!this.directionsPanel?.classList.contains('hidden')) {
+        this.hidePlaceSheet();
       }
     });
 
-    // Clear search
+    this.btnCloseDirections?.addEventListener('click', () => {
+      this.directionsPanel?.classList.add('hidden');
+    });
+
+    // Close Place Sheet
+    this.btnClosePlaceSheet?.addEventListener('click', () => {
+      this.hidePlaceSheet();
+    });
+
+    // Clear Search Input
     this.searchClearBtn?.addEventListener('click', () => {
       this.searchInput.value = '';
       this.searchClearBtn.classList.add('hidden');
@@ -117,36 +116,119 @@ export class UIController {
       this.navStartSelect.value = this.navGoalSelect.value;
       this.navGoalSelect.value = temp;
     });
+
+    // Voice Navigation Mute/Unmute
+    this.btnToggleVoice?.addEventListener('click', () => {
+      this.voiceEnabled = !this.voiceEnabled;
+      this.voiceIcon.textContent = this.voiceEnabled ? '🔊' : '🔇';
+      this.showToast(this.voiceEnabled ? 'Voice navigation unmuted' : 'Voice navigation muted', 'info');
+      if (!this.voiceEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== this.searchInput) {
+        e.preventDefault();
+        this.searchInput?.focus();
+      } else if (e.key === 'Escape') {
+        this.hideSearchResults();
+        this.hidePlaceSheet();
+      }
+    });
   }
 
-  setBackendStatus(online, latencyMs = 0) {
-    if (online) {
-      this.backendStatusText.textContent = 'Backend Online';
-      this.backendStatusPill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-      this.backendLatency.textContent = `${latencyMs} ms`;
-      this.hudApiLatency.textContent = `${latencyMs} ms`;
-    } else {
-      this.backendStatusText.textContent = 'Offline / Error';
-      this.backendStatusPill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-      this.backendLatency.textContent = 'err';
+  // --- Voice Synthesis (Google Maps style) ---
+  speakInstruction(text) {
+    if (!this.voiceEnabled || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Speech synthesis error:', e);
     }
   }
 
+  // --- Green Top Navigation Banner ---
+  showNavigationBanner(step, nextStep) {
+    this.activeNavBanner.classList.remove('hidden');
+    const distText = step.distance_meters > 0 ? `In ${step.distance_meters.toFixed(0)} m` : 'Arrived';
+    this.navBannerDistance.textContent = distText;
+    this.navBannerInstruction.textContent = step.instruction;
+
+    if (nextStep) {
+      this.navBannerNext.textContent = `Then: ${nextStep.instruction}`;
+      this.navBannerNext.classList.remove('hidden');
+    } else {
+      this.navBannerNext.classList.add('hidden');
+    }
+
+    this.speakInstruction(step.instruction);
+  }
+
+  hideNavigationBanner() {
+    this.activeNavBanner.classList.add('hidden');
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  // --- Bottom Trip Bar ---
+  showTripBar(timeSec, distanceMeters, stepCount) {
+    this.gmapsTripBar.classList.remove('hidden');
+    const mins = Math.floor(timeSec / 60);
+    const secs = Math.round(timeSec % 60);
+    this.tripTime.textContent = mins > 0 ? `${mins} min ${secs} s` : `${secs} sec`;
+    this.tripDistance.textContent = `${distanceMeters.toFixed(1)} m`;
+    this.tripStepsCount.textContent = `${stepCount} steps`;
+    this.setNavigationActive(false);
+  }
+
+  hideTripBar() {
+    this.gmapsTripBar.classList.add('hidden');
+    this.hideNavigationBanner();
+  }
+
+  setNavigationActive(active) {
+    this.navigating = active;
+    if (active) {
+      this.navBtnText.textContent = 'Pause';
+      this.btnStartNavigation.classList.add('nav-running');
+    } else {
+      this.navBtnText.textContent = 'Start';
+      this.btnStartNavigation.classList.remove('nav-running');
+    }
+  }
+
+  // --- Loading Screen ---
   showLoading(title, subtitle, progress = 20) {
-    this.loadingOverlay.classList.remove('fade-out');
-    if (title) this.loadingOverlay.querySelector('.loader-title').textContent = title;
-    if (subtitle) this.loaderStatus.textContent = subtitle;
-    this.loaderProgressFill.style.width = `${progress}%`;
+    this.loadingOverlay?.classList.remove('fade-out');
+    if (title && this.loadingOverlay?.querySelector('.loader-title')) {
+      this.loadingOverlay.querySelector('.loader-title').textContent = title;
+    }
+    if (subtitle && this.loaderStatus) {
+      this.loaderStatus.textContent = subtitle;
+    }
+    if (this.loaderProgressFill) {
+      this.loaderProgressFill.style.width = `${progress}%`;
+    }
   }
 
   hideLoading() {
-    this.loaderProgressFill.style.width = '100%';
+    if (this.loaderProgressFill) this.loaderProgressFill.style.width = '100%';
     setTimeout(() => {
-      this.loadingOverlay.classList.add('fade-out');
+      this.loadingOverlay?.classList.add('fade-out');
     }, 250);
   }
 
+  // --- Venue & POI Population ---
   populateVenues(venues, currentVenueId) {
+    if (!this.venueSelect) return;
     this.venueSelect.innerHTML = '';
     venues.forEach((v) => {
       const opt = document.createElement('option');
@@ -158,12 +240,9 @@ export class UIController {
   }
 
   populatePOIs(pois) {
-    this.hudPoisCount.textContent = pois.length;
-
     // Reset dropdowns
-    this.navStartSelect.innerHTML = '<option value="">Choose Starting Point...</option>';
-    this.navGoalSelect.innerHTML = '<option value="">Choose Destination...</option>';
-    this.quickChipsContainer.innerHTML = '';
+    this.navStartSelect.innerHTML = '<option value="user_pos">📍 My Current Location (Blue Dot)</option>';
+    this.navGoalSelect.innerHTML = '<option value="">Choose destination...</option>';
 
     pois.forEach((poi) => {
       const opt1 = document.createElement('option');
@@ -175,34 +254,63 @@ export class UIController {
       opt2.value = poi.id;
       opt2.textContent = `${poi.name} [${poi.category}]`;
       this.navGoalSelect.appendChild(opt2);
-
-      // Quick Chips (First 6)
-      if (this.quickChipsContainer.children.length < 6) {
-        const chip = document.createElement('button');
-        chip.className = 'poi-chip';
-        chip.textContent = poi.name;
-        chip.title = `Quick route to ${poi.name}`;
-        chip.addEventListener('click', () => {
-          this.navGoalSelect.value = poi.id;
-          if (!this.navStartSelect.value && pois.length > 1) {
-            // default start to first POI or another
-            const other = pois.find((p) => p.id !== poi.id);
-            if (other) this.navStartSelect.value = other.id;
-          }
-          this.btnCalculateRoute.click();
-        });
-        this.quickChipsContainer.appendChild(chip);
-      }
     });
   }
 
+  // --- Place Details Sheet (Google Maps Style) ---
+  showPlaceSheet(poi, onDirections, onSetStart, onFocus) {
+    this.activePOI = poi;
+    this.placeCategory.textContent = (poi.category || 'Location').replace('_', ' ').toUpperCase();
+    this.placeTitle.textContent = poi.name;
+    this.placeDescription.textContent = poi.description || 'Indoor point of interest.';
+    this.placeCoords.textContent = `(${poi.position.x.toFixed(1)}, ${poi.position.z.toFixed(1)})`;
+    this.placeFloor.textContent = poi.floor === 1 ? 'L2' : 'L1';
+
+    // Tags
+    this.placeTags.innerHTML = '';
+    if (poi.tags && poi.tags.length > 0) {
+      poi.tags.forEach((tag) => {
+        const span = document.createElement('span');
+        span.className = 'place-tag';
+        span.textContent = `#${tag}`;
+        this.placeTags.appendChild(span);
+      });
+    }
+
+    // Directions button: opens directions panel with this as destination
+    this.btnPlaceDirections.onclick = () => {
+      this.hidePlaceSheet();
+      this.navGoalSelect.value = poi.id;
+      this.directionsPanel.classList.remove('hidden');
+      if (onDirections) onDirections(poi);
+    };
+
+    this.btnPlaceSetStart.onclick = () => {
+      this.navStartSelect.value = poi.id;
+      this.showToast(`Set '${poi.name}' as starting point.`, 'success');
+      if (onSetStart) onSetStart(poi);
+    };
+
+    this.btnPlaceFocus.onclick = () => {
+      if (onFocus) onFocus(poi);
+    };
+
+    this.gmapsPlaceSheet.classList.remove('hidden');
+  }
+
+  hidePlaceSheet() {
+    this.gmapsPlaceSheet?.classList.add('hidden');
+    this.activePOI = null;
+  }
+
+  // --- Search Autocomplete Results ---
   showSearchResults(results, onSelect) {
     this.searchResultsDropdown.innerHTML = '';
     this.searchResultsDropdown.classList.remove('hidden');
 
     if (!results || results.length === 0) {
       this.searchResultsDropdown.innerHTML = `
-        <div class="search-empty-state">No matching locations found. Try another search term.</div>
+        <div class="search-empty-state">No matching indoor locations found.</div>
       `;
       return;
     }
@@ -211,7 +319,7 @@ export class UIController {
       const row = document.createElement('div');
       row.className = 'search-result-item';
       const distStr = item.distance !== undefined ? ` • ${item.distance.toFixed(1)}m away` : '';
-      const matchedFieldStr = item.matched_field ? `via ${item.matched_field}` : '';
+      const matchedFieldStr = item.matched_field ? `matched ${item.matched_field}` : '';
 
       row.innerHTML = `
         <div class="result-main">
@@ -237,111 +345,61 @@ export class UIController {
   }
 
   hideSearchResults() {
-    this.searchResultsDropdown.classList.add('hidden');
+    this.searchResultsDropdown?.classList.add('hidden');
   }
 
-  showPOIDetail(poi, onNavigate, onSetStart, onFocus) {
-    this.activePOI = poi;
-    this.poiCardCategory.textContent = poi.category || 'Location';
-    this.poiCardTitle.textContent = poi.name;
-    this.poiCardDescription.textContent = poi.description || 'No additional description provided.';
-    this.poiCardX.textContent = poi.position.x.toFixed(2);
-    this.poiCardY.textContent = poi.position.y.toFixed(2);
-    this.poiCardZ.textContent = poi.position.z.toFixed(2);
-    this.poiCardFloor.textContent = poi.floor ?? 0;
-
-    // Tags
-    this.poiCardTags.innerHTML = '';
-    if (poi.tags && poi.tags.length > 0) {
-      poi.tags.forEach((tag) => {
-        const pill = document.createElement('span');
-        pill.className = 'poi-tag-pill';
-        pill.textContent = `#${tag}`;
-        this.poiCardTags.appendChild(pill);
-      });
-    }
-
-    // Actions
-    this.btnPoiNavigateTo.onclick = () => {
-      this.navGoalSelect.value = poi.id;
-      this.navDrawer.classList.remove('collapsed');
-      if (onNavigate) onNavigate(poi);
-    };
-
-    this.btnPoiSetStart.onclick = () => {
-      this.navStartSelect.value = poi.id;
-      this.navDrawer.classList.remove('collapsed');
-      if (onSetStart) onSetStart(poi);
-      this.showToast(`Set '${poi.name}' as route start point.`, 'success');
-    };
-
-    this.btnPoiFocus.onclick = () => {
-      if (onFocus) onFocus(poi);
-    };
-
-    this.poiDetailCard.classList.remove('hidden');
-  }
-
+  // --- Route & Natural Directions Display ---
   showRouteSummary(navData) {
-    this.routeSummary.classList.remove('hidden');
-    this.metricDistance.textContent = `${navData.total_distance_meters.toFixed(1)} m`;
-    this.metricTime.textContent = `${navData.estimated_walking_time_seconds.toFixed(0)} s`;
-    this.metricLatency.textContent = `${navData.execution_time_ms.toFixed(1)} ms`;
-    this.metricWaypoints.textContent = `${navData.total_waypoints} ${navData.path_smoothed ? '(Smoothed)' : ''}`;
+    // Show summary in directions panel
+    this.directionsStepContainer?.classList.remove('hidden');
+    this.routeTimeVal.textContent = `${Math.round(navData.estimated_walking_time_seconds)} s`;
+    this.routeDistVal.textContent = `(${navData.total_distance_meters.toFixed(1)} m)`;
+    this.routeLatencyBadge.textContent = `A* ${navData.execution_time_ms.toFixed(0)}ms`;
 
-    // Dynamic Obstacle Reroute Alert
+    // Dynamic Hazard Reroute Alert
     if (navData.rerouted_due_to_obstacles) {
       const avoidedStr =
         navData.avoided_obstacles && navData.avoided_obstacles.length > 0
           ? ` (${navData.avoided_obstacles.join(', ')})`
           : '';
-      this.routeRerouteText.textContent = `Route safely diverted around active hazard${avoidedStr}!`;
+      this.routeRerouteAlert.innerHTML = `<span>⚠️ Rerouted around floor spill hazard${avoidedStr}!</span>`;
       this.routeRerouteAlert.classList.remove('hidden');
     } else {
       this.routeRerouteAlert.classList.add('hidden');
     }
 
-    // Turn-by-Turn Natural Directions
+    // Populate Natural Directions Step List
     this.directionsList.innerHTML = '';
-    if (navData.directions && navData.directions.length > 0) {
-      this.directionsCount.textContent = `${navData.directions.length} steps`;
-      navData.directions.forEach((d) => {
-        const card = document.createElement('div');
-        card.className = 'direction-step-card';
-        card.dataset.stepIndex = d.waypoint_index;
+    const directions = navData.directions || [];
+    directions.forEach((d) => {
+      const card = document.createElement('div');
+      card.className = 'direction-step-card';
+      card.dataset.stepIndex = d.waypoint_index;
 
-        const landmarkTag = d.nearby_landmark
-          ? `<span class="step-landmark">📍 near ${d.nearby_landmark}</span>`
-          : '';
-        const distTag = d.distance_meters > 0 ? `${d.distance_meters.toFixed(1)}m • ` : '';
+      const landmarkTag = d.nearby_landmark
+        ? `<span class="step-landmark">📍 near ${d.nearby_landmark}</span>`
+        : '';
+      const distTag = d.distance_meters > 0 ? `${d.distance_meters.toFixed(1)}m • ` : '';
 
-        card.innerHTML = `
-          <span class="step-num-badge">#${d.step}</span>
-          <div class="step-content">
-            <span class="step-instruction">${d.instruction}</span>
-            <div class="step-meta">
-              <span>${distTag}${d.compass_bearing_deg}° ${d.cardinal_direction}</span>
-              ${landmarkTag}
-            </div>
+      card.innerHTML = `
+        <span class="step-num-badge">#${d.step}</span>
+        <div class="step-content">
+          <span class="step-instruction">${d.instruction}</span>
+          <div class="step-meta">
+            <span>${distTag}${d.compass_bearing_deg}° ${d.cardinal_direction}</span>
+            ${landmarkTag}
           </div>
-        `;
-        this.directionsList.appendChild(card);
-      });
-    } else {
-      this.directionsCount.textContent = '0 steps';
-    }
-
-    // Waypoints Timeline
-    this.waypointsList.innerHTML = '';
-    navData.waypoints.forEach((wp, idx) => {
-      const item = document.createElement('div');
-      item.className = 'waypoint-item';
-      item.innerHTML = `
-        <span class="waypoint-num">Step ${idx + 1}</span>
-        <span>(${wp.x.toFixed(2)}, ${wp.z.toFixed(2)})</span>
+        </div>
       `;
-      this.waypointsList.appendChild(item);
+      this.directionsList.appendChild(card);
     });
+
+    // Also Show Google Maps Bottom Trip Bar
+    this.showTripBar(
+      navData.estimated_walking_time_seconds,
+      navData.total_distance_meters,
+      directions.length
+    );
   }
 
   highlightActiveDirectionStep(wpIndex) {
@@ -357,46 +415,30 @@ export class UIController {
     });
   }
 
-  updateObstacleBadge(count) {
-    if (this.obstacleCountBadge) {
-      this.obstacleCountBadge.textContent = `${count} Active`;
-    }
-  }
-
-  hideRouteSummary() {
-    this.routeSummary.classList.add('hidden');
-    this.routeRerouteAlert?.classList.add('hidden');
-  }
-
+  // --- Tooltips & Toasts ---
   showHoverTooltip(poi, clientX, clientY) {
     if (!poi) {
-      this.poiHoverTooltip.classList.add('hidden');
+      this.poiHoverTooltip?.classList.add('hidden');
       return;
     }
     this.tooltipTitle.textContent = poi.name;
-    this.tooltipCategory.textContent = poi.category;
-    this.poiHoverTooltip.style.left = `${clientX}px`;
-    this.poiHoverTooltip.style.top = `${clientY}px`;
+    this.tooltipCategory.textContent = (poi.category || '').toUpperCase();
+    this.poiHoverTooltip.style.left = `${clientX + 14}px`;
+    this.poiHoverTooltip.style.top = `${clientY + 14}px`;
     this.poiHoverTooltip.classList.remove('hidden');
   }
 
   showToast(message, type = 'info') {
+    if (!this.toastContainer) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
     this.toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateX(20px)';
+      toast.style.transform = 'translateY(12px)';
       toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 3200);
-  }
-
-  updateHUD(fps, dimensions) {
-    this.hudFps.textContent = fps;
-    if (dimensions) {
-      this.hudDimensions.textContent = `${dimensions.x}m × ${dimensions.z}m`;
-    }
   }
 }
