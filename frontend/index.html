@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NammaSpace 3D | Indoor Digital Twin & Spatial Navigation</title>
+  <meta name="description" content="Production-grade 3D Digital Twin platform with obstacle-aware A* pathfinding, typo-tolerant POI search, and sub-millisecond spatial queries.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Import maps polyfill & Three.js ES Modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <!-- Tween.js for smooth camera transitions & route tour animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/20.0.0/tween.umd.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav glass-panel">
+      <div class="nav-left">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">NammaSpace</span>
+            <span class="brand-badge">3D Twin</span>
+          </div>
+        </div>
+
+        <!-- Venue Selector Dropdown -->
+        <div class="venue-selector-container">
+          <label for="venue-select" class="sr-only">Active Venue</label>
+          <div class="select-wrapper">
+            <svg class="select-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <select id="venue-select" aria-label="Select Venue">
+              <option value="" disabled selected>Loading venues...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Controls -->
+      <div class="nav-right">
+        <div class="backend-status-pill" id="backend-status" title="FastAPI Backend Health">
+          <span class="status-dot pulsing"></span>
+          <span class="status-label" id="backend-status-text">Connecting...</span>
+          <span class="latency-badge" id="backend-latency">-- ms</span>
+        </div>
+
+        <button class="nav-btn" id="btn-toggle-view" title="Toggle 3D Perspective / Top-Down View">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="22" y1="12" x2="18" y2="12"></line>
+            <line x1="6" y1="12" x2="2" y2="12"></line>
+            <line x1="12" y1="6" x2="12" y2="2"></line>
+            <line x1="12" y1="22" x2="12" y2="18"></line>
+          </svg>
+          <span class="btn-text">Top-Down</span>
+        </button>
+
+        <button class="nav-btn" id="btn-toggle-navmesh" title="Toggle 2D Occupancy Grid Floor Map">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="3" y1="15" x2="21" y2="15"></line>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+            <line x1="15" y1="3" x2="15" y2="21"></line>
+          </svg>
+          <span class="btn-text">Navmesh</span>
+        </button>
+
+        <button class="nav-btn" id="btn-reset-camera" title="Reset Camera to Venue Spawn Point">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span class="btn-text">Reset</span>
+        </button>
+
+        <a href="/docs" target="_blank" rel="noopener" class="nav-btn nav-btn-accent" title="Interactive Swagger API Contract">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span class="btn-text">API Docs</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Floating Top Search Bar (Typo-Tolerant Multi-Field) -->
+    <div class="search-container">
+      <div class="search-input-wrapper glass-panel">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search POIs, equipment, rooms... (e.g. 'wrkstation', 'cofee', 'drone')" 
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <span class="search-shortcut-badge">/</span>
+        <button id="search-clear-btn" class="search-clear-btn hidden" title="Clear Search">✕</button>
+      </div>
+
+      <!-- Autocomplete Dropdown -->
+      <div id="search-results-dropdown" class="search-results-dropdown glass-panel hidden">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Navigation & Pathfinding Sidebar / Drawer -->
+    <aside class="nav-drawer glass-panel" id="nav-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+          <span>Obstacle-Aware Navigation</span>
+        </div>
+        <button class="drawer-toggle-btn" id="drawer-toggle-btn" title="Toggle Navigation Panel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <div class="drawer-content">
+        <!-- Origin & Destination Form -->
+        <div class="nav-form">
+          <div class="nav-input-group">
+            <div class="point-indicator point-start">A</div>
+            <div class="select-wrapper flex-1">
+              <select id="nav-start-select" aria-label="Route Start Point">
+                <option value="">Choose Starting Point...</option>
+              </select>
+            </div>
+            <button class="icon-btn-subtle" id="btn-use-camera-start" title="Use current 3D camera position">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <div class="nav-swap-row">
+            <div class="nav-line-connector"></div>
+            <button class="nav-swap-btn" id="btn-swap-points" title="Swap Start and Destination">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8v12M17 20l4-4M17 20l-4-4"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="nav-input-group">
+            <div class="point-indicator point-goal">B</div>
+            <div class="select-wrapper flex-1">
+              <select id="nav-goal-select" aria-label="Route Destination Point">
+                <option value="">Choose Destination...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="nav-options">
+            <label class="toggle-control">
+              <input type="checkbox" id="nav-smooth-toggle" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Line-of-Sight Smoothing (Raycasting)</span>
+            </label>
+          </div>
+
+          <!-- Action Button -->
+          <button class="nav-submit-btn" id="btn-calculate-route">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="6" y1="3" x2="6" y2="15"></line>
+              <circle cx="18" cy="6" r="3"></circle>
+              <circle cx="6" cy="18" r="3"></circle>
+              <path d="M18 9a9 9 0 0 1-9 9"></path>
+            </svg>
+            <span>Compute Optimal Path</span>
+          </button>
+        </div>
+
+        <!-- Route Results Summary -->
+        <div id="route-summary" class="route-summary-panel hidden">
+          <div class="route-metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label">Distance</span>
+              <span class="metric-value text-accent" id="metric-distance">0.0 m</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Est. Walk</span>
+              <span class="metric-value" id="metric-time">0 s</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">A* Latency</span>
+              <span class="metric-value text-emerald" id="metric-latency">0 ms</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Waypoints</span>
+              <span class="metric-value" id="metric-waypoints">0</span>
+            </div>
+          </div>
+
+          <!-- Interactive Tour / Walkthrough Controls -->
+          <div class="route-tour-controls">
+            <button class="btn-tour" id="btn-start-tour">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Walkthrough Tour</span>
+            </button>
+            <button class="btn-clear-route" id="btn-clear-route" title="Clear Path from 3D View">
+              Clear Path
+            </button>
+          </div>
+
+          <!-- Waypoints Timeline -->
+          <div class="waypoints-list-container">
+            <div class="waypoints-header">Waypoint Trajectory</div>
+            <div class="waypoints-list" id="waypoints-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick POI Discovery Chips -->
+        <div class="quick-chips-section">
+          <span class="section-subheading">Quick Destinations</span>
+          <div class="chips-container" id="quick-poi-chips">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main 3D Canvas Viewport -->
+    <div id="viewport-container">
+      <canvas id="webgl-canvas"></canvas>
+
+      <!-- 3D Loading Overlay -->
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="loader-card glass-panel">
+          <div class="spinner"></div>
+          <div class="loader-title">Loading 3D Twin...</div>
+          <div class="loader-subtitle" id="loader-status">Fetching spatial configuration...</div>
+          <div class="loader-progress-bar">
+            <div class="loader-progress-fill" id="loader-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D Tooltip for Hovering Pins -->
+      <div id="poi-hover-tooltip" class="poi-hover-tooltip hidden">
+        <div class="tooltip-title" id="tooltip-title">POI Name</div>
+        <div class="tooltip-category" id="tooltip-category">Category</div>
+      </div>
+    </div>
+
+    <!-- POI Detail Card (Floating Bottom-Right) -->
+    <div id="poi-detail-card" class="poi-detail-card glass-panel hidden">
+      <button class="card-close-btn" id="btn-close-poi-card" title="Close">✕</button>
+      <div class="card-header">
+        <span class="poi-category-badge" id="poi-card-category">Workstation</span>
+        <h3 class="poi-title" id="poi-card-title">Workstation Alpha</h3>
+      </div>
+      <p class="poi-description" id="poi-card-description">Description goes here.</p>
+      
+      <div class="poi-coords-bar">
+        <span class="coord-item"><strong>X:</strong> <span id="poi-card-x">0.00</span>m</span>
+        <span class="coord-item"><strong>Y:</strong> <span id="poi-card-y">0.00</span>m</span>
+        <span class="coord-item"><strong>Z:</strong> <span id="poi-card-z">0.00</span>m</span>
+        <span class="coord-item"><strong>Floor:</strong> <span id="poi-card-floor">0</span></span>
+      </div>
+
+      <div class="poi-tags" id="poi-card-tags">
+        <!-- Rendered tags -->
+      </div>
+
+      <div class="poi-actions">
+        <button class="poi-btn-action poi-btn-navigate" id="btn-poi-navigate-to">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+          <span>Route Here</span>
+        </button>
+        <button class="poi-btn-action poi-btn-start" id="btn-poi-set-start">
+          Set as Start
+        </button>
+        <button class="poi-btn-action poi-btn-secondary" id="btn-poi-focus">
+          Center Camera
+        </button>
+      </div>
+    </div>
+
+    <!-- Performance & Telemetry HUD (Bottom-Left) -->
+    <div class="telemetry-hud glass-panel">
+      <div class="hud-item">
+        <span class="hud-label">FPS</span>
+        <span class="hud-value text-emerald" id="hud-fps">60</span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <span class="hud-label">POIs</span>
+        <span class="hud-value" id="hud-pois-count">0</span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <span class="hud-label">Bounds</span>
+        <span class="hud-value" id="hud-dimensions">-- m</span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <span class="hud-label">API Latency</span>
+        <span class="hud-value text-accent" id="hud-api-latency">0 ms</span>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <!-- Application Scripts -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

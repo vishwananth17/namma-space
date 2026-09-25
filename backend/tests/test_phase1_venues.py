@@ -119,3 +119,12 @@ def test_openapi_schema_generation(client):
     assert "/health" in spec["paths"]
     assert "/venues" in spec["paths"]
     assert "/venues/{venue_id}" in spec["paths"]
+
+
+def test_frontend_viewer_served(client):
+    """GET / or GET /viewer should serve the 3D Digital Twin Viewer HTML."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "NammaSpace 3D" in response.text
+    assert "webgl-canvas" in response.text
+

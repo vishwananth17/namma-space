@@ -1,4 +1,5 @@
 import mimetypes
+from pathlib import Path
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -143,14 +144,6 @@ app.include_router(search_router)
 app.include_router(navigation_router)
 
 
-@app.get("/", include_in_schema=False)
-async def root_redirect():
-    """Redirect root to Swagger UI documentation."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
-
-
-
 # 5. Static file serving for venue models, maps, and textures
 settings.VENUES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
@@ -158,3 +151,28 @@ app.mount(
     ModelStaticFiles(directory=str(settings.VENUES_DIR)),
     name="venue_models",
 )
+
+# 6. Static file serving for 3D digital twin frontend
+frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+if not frontend_dir.exists():
+    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+
+if frontend_dir.exists():
+    css_dir = frontend_dir / "css"
+    js_dir = frontend_dir / "js"
+    if css_dir.exists():
+        app.mount("/css", StaticFiles(directory=str(css_dir)), name="frontend_css")
+    if js_dir.exists():
+        app.mount("/js", StaticFiles(directory=str(js_dir)), name="frontend_js")
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/viewer", include_in_schema=False)
+async def serve_frontend_or_docs():
+    """Serve 3D digital twin frontend if available, else redirect to /docs."""
+    index_path = frontend_dir / "index.html"
+    if frontend_dir.exists() and index_path.exists():
+        from fastapi.responses import FileResponse
+        return FileResponse(str(index_path))
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
