@@ -38,11 +38,20 @@ export class Viewer3D {
     this.userPos = { x: 0.0, y: 0.1, z: 2.0, headingDeg: 0 };
     this.userHeadingRad = 0;
 
+    // Live Walking Sensor & Pedometer Tracking
+    this.liveTrackingActive = false;
+    this.stepCount = 0;
+    this.lastStepTimestamp = 0;
+    this.activeRouteWaypoints = null;
+    this.activeRouteIndex = 0;
+
     // Callbacks
     this.onPOIClick = null;
     this.onPOIHover = null;
     this.onFloorClick = null;
     this.onCameraRotate = null;
+    this.onUserWalkStep = null;
+    this.onHeadingChange = null;
 
     // Category Colors (Google Maps style)
     this.categoryColors = {
@@ -121,9 +130,138 @@ export class Viewer3D {
     window.addEventListener('resize', () => this._onWindowResize());
     this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
     this.canvas.addEventListener('click', (e) => this._onMouseClick(e));
+    this._setupSensorAndKeyboardControls();
 
     // 9. Animation Loop
     this._animate();
+  }
+
+  _setupSensorAndKeyboardControls() {
+    // 1. Device Orientation (Physical Phone Compass)
+    window.addEventListener('deviceorientation', (e) => {
+      let heading = null;
+      if (e.webkitCompassHeading !== undefined) {
+        heading = e.webkitCompassHeading;
+      } else if (e.alpha !== null) {
+        heading = (360 - e.alpha) % 360;
+      }
+      if (heading !== null && Math.abs(heading - this.userPos.headingDeg) > 1.5) {
+        this.setUserPosition(this.userPos.x, this.userPos.z, heading);
+        if (this.onHeadingChange) this.onHeadingChange(heading);
+      }
+    });
+
+    // 2. Device Motion (Pedestrian Step Detector)
+    window.addEventListener('devicemotion', (e) => {
+      if (!this.liveTrackingActive) return;
+      const acc = e.accelerationIncludingGravity || e.acceleration;
+      if (!acc) return;
+      const mag = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+      const now = performance.now();
+      // Heel-strike acceleration spike threshold (approx 12.2 m/s² with gravity)
+      if (mag > 12.2 && (now - this.lastStepTimestamp) > 340) {
+        this.lastStepTimestamp = now;
+        this.stepCount++;
+        this.walkForward(0.7);
+      }
+    });
+
+    // 3. Desktop / Laptop Keyboard Controls (WASD / Arrows)
+    window.addEventListener('keydown', (e) => {
+      // Do not trigger if typing in search input
+      if (document.activeElement?.tagName === 'INPUT') return;
+
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        this.walkForward(0.65);
+      } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
+        e.preventDefault();
+        this.walkForward(-0.65);
+      } else if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
+        e.preventDefault();
+        this.turnHeading(-15);
+      } else if (e.code === 'KeyD' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        this.turnHeading(15);
+      }
+    });
+  }
+
+  walkForward(distance = 0.65) {
+    let targetX = this.userPos.x;
+    let targetZ = this.userPos.z;
+
+    if (this.activeRouteWaypoints && this.activeRouteWaypoints.length > 1) {
+      // Advance along active navigation route
+      const wps = this.activeRouteWaypoints;
+      let nextWp = wps[this.activeRouteIndex + 1];
+      if (!nextWp) nextWp = wps[wps.length - 1];
+
+      const dx = nextWp.x - this.userPos.x;
+      const dz = nextWp.z - this.userPos.z;
+      const distToNext = Math.hypot(dx, dz);
+
+      if (distToNext <= Math.abs(distance)) {
+        targetX = nextWp.x;
+        targetZ = nextWp.z;
+        if (this.activeRouteIndex < wps.length - 2) {
+          this.activeRouteIndex++;
+        }
+      } else {
+        const ratio = distance / distToNext;
+        targetX += dx * ratio;
+        targetZ += dz * ratio;
+      }
+
+      const rad = Math.atan2(dx, -dz);
+      const headingDeg = (THREE.MathUtils.radToDeg(rad) + 360) % 360;
+      this.setUserPosition(targetX, targetZ, headingDeg);
+    } else {
+      // Free roaming in current heading direction
+      const rad = THREE.MathUtils.degToRad(this.userPos.headingDeg || 0);
+      targetX += Math.sin(rad) * distance;
+      targetZ -= Math.cos(rad) * distance;
+      this.setUserPosition(targetX, targetZ, this.userPos.headingDeg);
+    }
+
+    // Follow camera smoothly
+    const dX = targetX - this.controls.target.x;
+    const dZ = targetZ - this.controls.target.z;
+    this.camera.position.x += dX;
+    this.camera.position.z += dZ;
+    this.controls.target.set(targetX, 0.2, targetZ);
+
+    if (this.onUserWalkStep) {
+      this.onUserWalkStep(this.userPos, this.stepCount);
+    }
+  }
+
+  turnHeading(degDelta) {
+    const newHeading = ((this.userPos.headingDeg || 0) + degDelta + 360) % 360;
+    this.setUserPosition(this.userPos.x, this.userPos.z, newHeading);
+  }
+
+  async toggleLiveTracking() {
+    if (this.liveTrackingActive) {
+      this.liveTrackingActive = false;
+      return false;
+    }
+
+    // Request iOS orientation permission if required
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const response = await DeviceOrientationEvent.requestPermission();
+        if (response !== 'granted') {
+          console.warn('Motion sensor permission denied by user.');
+        }
+      } catch (err) {
+        console.warn('Error requesting device orientation permission:', err);
+      }
+    }
+
+    this.liveTrackingActive = true;
+    this.stepCount = 0;
+    return true;
   }
 
   _createUserBlueDot() {
@@ -443,6 +581,8 @@ export class Viewer3D {
   renderPath(waypoints) {
     this.clearPath();
     if (!waypoints || waypoints.length < 2) return;
+    this.activeRouteWaypoints = waypoints;
+    this.activeRouteIndex = 0;
 
     const points = waypoints.map((wp) => new THREE.Vector3(wp.x, 0.12, wp.z));
     const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.15);
@@ -499,6 +639,8 @@ export class Viewer3D {
 
   clearPath() {
     this.stopNavigation();
+    this.activeRouteWaypoints = null;
+    this.activeRouteIndex = 0;
     while (this.pathGroup.children.length > 0) {
       this.pathGroup.remove(this.pathGroup.children[0]);
     }

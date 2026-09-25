@@ -264,6 +264,50 @@ class App {
       this.ui.showToast('Re-centered on your indoor position.', 'info');
     });
 
+    // 9B. Floating Control: Live Walking Sensor & Pedometer
+    this.ui.btnLiveTracking?.addEventListener('click', async () => {
+      const active = await this.viewer.toggleLiveTracking();
+      this.ui.setLiveTrackingActive(active);
+    });
+
+    // 9C. Live Walking Step Callback (Pedometer & Step-by-Step countdown)
+    this.viewer.onUserWalkStep = (userPos, stepCount) => {
+      if (!this.activeRoute?.directions) return;
+
+      const waypoints = this.activeRoute.waypoints || [];
+      const directions = this.activeRoute.directions || [];
+      const goalWp = waypoints[waypoints.length - 1];
+
+      if (goalWp) {
+        const distToGoal = Math.hypot(goalWp.x - userPos.x, goalWp.z - userPos.z);
+        const remainingSec = Math.round(distToGoal / 1.2);
+
+        this.ui.tripTime.textContent = `${remainingSec} sec`;
+        this.ui.tripDistance.textContent = `${distToGoal.toFixed(1)} m`;
+
+        if (distToGoal < 1.0) {
+          this.ui.showNavigationBanner(
+            { distance_meters: 0, instruction: 'You have arrived at your destination! 📍' },
+            null
+          );
+          return;
+        }
+
+        const stepIdx = this.viewer.activeRouteIndex;
+        const currentDir =
+          directions.find((d) => d.waypoint_index >= stepIdx) || directions[directions.length - 1];
+        const nextDir = directions[directions.indexOf(currentDir) + 1] || null;
+
+        if (currentDir) {
+          this.ui.showNavigationBanner(
+            { ...currentDir, distance_meters: distToGoal },
+            nextDir
+          );
+          this.ui.highlightActiveDirectionStep(currentDir.waypoint_index);
+        }
+      }
+    };
+
     // 10. Floating Control: Compass Re-orient North
     this.ui.btnCompass?.addEventListener('click', () => {
       this.viewer.resetNorth();

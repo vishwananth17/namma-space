@@ -65,6 +65,9 @@ export class UIController {
     this.viewModeLabel = document.getElementById('view-mode-label');
     this.btnToggleNavmesh = document.getElementById('btn-toggle-navmesh');
     this.btnRecenterUser = document.getElementById('btn-recenter-user');
+    this.btnLiveTracking = document.getElementById('btn-live-tracking');
+    this.trackingIcon = document.getElementById('tracking-icon');
+    this.liveTrackingActive = false;
     this.floorButtons = document.querySelectorAll('.floor-btn');
     this.btnInjectSpill = document.getElementById('btn-inject-spill');
 
@@ -203,6 +206,23 @@ export class UIController {
       this.navBtnText.textContent = 'Start';
       this.btnStartNavigation.classList.remove('nav-running');
     }
+  }
+
+  setLiveTrackingActive(active) {
+    this.liveTrackingActive = active;
+    if (this.btnLiveTracking) {
+      this.btnLiveTracking.classList.toggle('active', active);
+      this.btnLiveTracking.classList.toggle('tracking-pulse', active);
+    }
+    if (this.trackingIcon) {
+      this.trackingIcon.textContent = active ? '🟢' : '🚶';
+    }
+    this.showToast(
+      active
+        ? '🚶 Live Pedestrian Tracking active: walk with your phone or press WASD/Arrows!'
+        : 'Live Pedestrian Tracking paused.',
+      'info'
+    );
   }
 
   // --- Loading Screen ---
