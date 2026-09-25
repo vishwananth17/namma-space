@@ -95,6 +95,30 @@ class ApiClient {
     });
   }
 
+  async listObstacles(venueId) {
+    return await this._fetch(`/venues/${encodeURIComponent(venueId)}/obstacles`);
+  }
+
+  async createObstacle(venueId, obstacle) {
+    return await this._fetch(`/venues/${encodeURIComponent(venueId)}/obstacles`, {
+      method: 'POST',
+      body: JSON.stringify(obstacle)
+    });
+  }
+
+  async deleteObstacle(venueId, obstacleId) {
+    return await this._fetch(
+      `/venues/${encodeURIComponent(venueId)}/obstacles/${encodeURIComponent(obstacleId)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  async clearObstacles(venueId) {
+    return await this._fetch(`/venues/${encodeURIComponent(venueId)}/obstacles/clear`, {
+      method: 'POST'
+    });
+  }
+
   getModelUrl(venueId, modelFile) {
     return `${this.baseUrl}/static/venues/${venueId}/${modelFile}`;
   }
@@ -105,3 +129,4 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+

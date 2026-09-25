@@ -33,6 +33,14 @@ export class UIController {
     this.waypointsList = document.getElementById('waypoints-list');
     this.quickChipsContainer = document.getElementById('quick-poi-chips');
 
+    this.routeRerouteAlert = document.getElementById('route-reroute-alert');
+    this.routeRerouteText = document.getElementById('route-reroute-text');
+    this.directionsCount = document.getElementById('directions-count');
+    this.directionsList = document.getElementById('directions-list');
+    this.btnInjectSpill = document.getElementById('btn-inject-spill');
+    this.btnClearHazards = document.getElementById('btn-clear-hazards');
+    this.obstacleCountBadge = document.getElementById('obstacle-count-badge');
+
     this.loadingOverlay = document.getElementById('loading-overlay');
     this.loaderStatus = document.getElementById('loader-status');
     this.loaderProgressFill = document.getElementById('loader-progress-fill');
@@ -281,6 +289,48 @@ export class UIController {
     this.metricLatency.textContent = `${navData.execution_time_ms.toFixed(1)} ms`;
     this.metricWaypoints.textContent = `${navData.total_waypoints} ${navData.path_smoothed ? '(Smoothed)' : ''}`;
 
+    // Dynamic Obstacle Reroute Alert
+    if (navData.rerouted_due_to_obstacles) {
+      const avoidedStr =
+        navData.avoided_obstacles && navData.avoided_obstacles.length > 0
+          ? ` (${navData.avoided_obstacles.join(', ')})`
+          : '';
+      this.routeRerouteText.textContent = `Route safely diverted around active hazard${avoidedStr}!`;
+      this.routeRerouteAlert.classList.remove('hidden');
+    } else {
+      this.routeRerouteAlert.classList.add('hidden');
+    }
+
+    // Turn-by-Turn Natural Directions
+    this.directionsList.innerHTML = '';
+    if (navData.directions && navData.directions.length > 0) {
+      this.directionsCount.textContent = `${navData.directions.length} steps`;
+      navData.directions.forEach((d) => {
+        const card = document.createElement('div');
+        card.className = 'direction-step-card';
+        card.dataset.stepIndex = d.waypoint_index;
+
+        const landmarkTag = d.nearby_landmark
+          ? `<span class="step-landmark">📍 near ${d.nearby_landmark}</span>`
+          : '';
+        const distTag = d.distance_meters > 0 ? `${d.distance_meters.toFixed(1)}m • ` : '';
+
+        card.innerHTML = `
+          <span class="step-num-badge">#${d.step}</span>
+          <div class="step-content">
+            <span class="step-instruction">${d.instruction}</span>
+            <div class="step-meta">
+              <span>${distTag}${d.compass_bearing_deg}° ${d.cardinal_direction}</span>
+              ${landmarkTag}
+            </div>
+          </div>
+        `;
+        this.directionsList.appendChild(card);
+      });
+    } else {
+      this.directionsCount.textContent = '0 steps';
+    }
+
     // Waypoints Timeline
     this.waypointsList.innerHTML = '';
     navData.waypoints.forEach((wp, idx) => {
@@ -294,8 +344,28 @@ export class UIController {
     });
   }
 
+  highlightActiveDirectionStep(wpIndex) {
+    const cards = this.directionsList.querySelectorAll('.direction-step-card');
+    cards.forEach((card) => {
+      const idx = parseInt(card.dataset.stepIndex, 10);
+      if (idx === wpIndex) {
+        card.classList.add('active-step');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        card.classList.remove('active-step');
+      }
+    });
+  }
+
+  updateObstacleBadge(count) {
+    if (this.obstacleCountBadge) {
+      this.obstacleCountBadge.textContent = `${count} Active`;
+    }
+  }
+
   hideRouteSummary() {
     this.routeSummary.classList.add('hidden');
+    this.routeRerouteAlert?.classList.add('hidden');
   }
 
   showHoverTooltip(poi, clientX, clientY) {

@@ -119,6 +119,39 @@ class OccupancyGrid:
                     if self.data[nr, nc] == STATE_WALKABLE:
                         self.data[nr, nc] = STATE_INFLATED
 
+    def clone(self) -> "OccupancyGrid":
+        """Create an independent copy of the grid for dynamic obstacle simulations."""
+        grid_copy = OccupancyGrid(
+            bounds=self.bounds,
+            cell_size=self.cell_size,
+            floor_height=self.floor_height,
+        )
+        grid_copy.data = self.data.copy()
+        return grid_copy
+
+    def apply_circular_obstacle(
+        self, x: float, z: float, radius_m: float, agent_radius_m: float = 0.3
+    ) -> None:
+        """Mark a circular dynamic obstacle with agent clearance inflation."""
+        total_radius = radius_m + agent_radius_m
+        c_center, r_center = self.world_to_grid(x, z)
+        r_cells = int(math.ceil(total_radius / self.cell_size))
+
+        col_min = max(0, c_center - r_cells)
+        col_max = min(self.cols - 1, c_center + r_cells)
+        row_min = max(0, r_center - r_cells)
+        row_max = min(self.rows - 1, r_center + r_cells)
+
+        for r in range(row_min, row_max + 1):
+            for c in range(col_min, col_max + 1):
+                wx, wz = self.grid_to_world(c, r)
+                dist = math.hypot(wx - x, wz - z)
+                if dist <= radius_m:
+                    self.data[r, c] = STATE_OBSTACLE
+                elif dist <= total_radius:
+                    if self.data[r, c] == STATE_WALKABLE:
+                        self.data[r, c] = STATE_INFLATED
+
     def save(self, file_path: Path) -> None:
         """Save grid and spatial metadata to compressed .npz archive."""
         file_path.parent.mkdir(parents=True, exist_ok=True)

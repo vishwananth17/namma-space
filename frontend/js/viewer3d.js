@@ -19,6 +19,7 @@ export class Viewer3D {
     this.venueGroup = new THREE.Group();
     this.poiGroup = new THREE.Group();
     this.pathGroup = new THREE.Group();
+    this.obstacleGroup = new THREE.Group();
     this.navmeshMesh = null;
 
     // Interaction & State
@@ -113,6 +114,7 @@ export class Viewer3D {
     this.scene.add(this.venueGroup);
     this.scene.add(this.poiGroup);
     this.scene.add(this.pathGroup);
+    this.scene.add(this.obstacleGroup);
 
     // 7. Event Listeners
     window.addEventListener('resize', () => this._onWindowResize());
@@ -626,6 +628,64 @@ export class Viewer3D {
     });
   }
 
+  renderObstacles(obstacles) {
+    while (this.obstacleGroup.children.length > 0) {
+      const child = this.obstacleGroup.children[0];
+      this.obstacleGroup.remove(child);
+    }
+
+    if (!obstacles || obstacles.length === 0) return;
+
+    obstacles.forEach((obs) => {
+      const group = new THREE.Group();
+      group.position.set(obs.x, 0.0, obs.z);
+
+      // 1. Translucent Hazard Cylinder
+      const cylGeo = new THREE.CylinderGeometry(obs.radius, obs.radius, 1.2, 24);
+      const cylMat = new THREE.MeshBasicMaterial({
+        color: 0xef4444,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      });
+      const cylMesh = new THREE.Mesh(cylGeo, cylMat);
+      cylMesh.position.y = 0.6;
+      group.add(cylMesh);
+
+      // 2. Wireframe Warning
+      const wireMat = new THREE.MeshBasicMaterial({
+        color: 0xf59e0b,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.5
+      });
+      const wireMesh = new THREE.Mesh(cylGeo, wireMat);
+      wireMesh.position.y = 0.6;
+      group.add(wireMesh);
+
+      // 3. Floor Caution Ring
+      const ringGeo = new THREE.RingGeometry(obs.radius * 0.88, obs.radius, 24);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xef4444,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.85
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = -Math.PI / 2;
+      ringMesh.position.y = 0.04;
+      ringMesh.name = 'hazardRing';
+      group.add(ringMesh);
+
+      // 4. Floating Warning Tag
+      const sprite = this._createTextSprite(`⚠️ ${obs.name}`, 0xef4444);
+      sprite.position.y = 1.4;
+      group.add(sprite);
+
+      this.obstacleGroup.add(group);
+    });
+  }
+
   clearAll() {
     this.clearPath();
     while (this.venueGroup.children.length > 0) {
@@ -633,6 +693,9 @@ export class Viewer3D {
     }
     while (this.poiGroup.children.length > 0) {
       this.poiGroup.remove(this.poiGroup.children[0]);
+    }
+    while (this.obstacleGroup.children.length > 0) {
+      this.obstacleGroup.remove(this.obstacleGroup.children[0]);
     }
     this.navmeshMesh = null;
   }
@@ -656,6 +719,15 @@ export class Viewer3D {
       }
       if (ring) {
         const s = 1.0 + Math.sin(tSec * 1.5 + idx) * 0.15;
+        ring.scale.set(s, s, 1);
+      }
+    });
+
+    // Pulse hazard obstacles
+    this.obstacleGroup.children.forEach((obsGroup, idx) => {
+      const ring = obsGroup.getObjectByName('hazardRing');
+      if (ring) {
+        const s = 1.0 + Math.sin(tSec * 2.5 + idx) * 0.08;
         ring.scale.set(s, s, 1);
       }
     });

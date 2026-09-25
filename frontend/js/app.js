@@ -64,13 +64,18 @@ class App {
       await this.viewer.loadVenue(venue, modelUrl);
 
       // 3. Load POIs
-      this.ui.showLoading(`Fetching POIs...`, 'Building in-memory KD-Tree spatial pins...', 90);
+      this.ui.showLoading(`Fetching POIs...`, 'Building in-memory KD-Tree spatial pins...', 85);
       const pois = await api.getPOIs(venueId);
       this.pois = pois;
       this.viewer.renderPOIs(pois);
       this.ui.populatePOIs(pois);
 
-      // 4. Update HUD
+      // 4. Load Dynamic Obstacles
+      const obstacles = await api.listObstacles(venueId);
+      this.viewer.renderObstacles(obstacles);
+      this.ui.updateObstacleBadge(obstacles.length);
+
+      // 5. Update HUD
       if (venue.bounds?.dimensions) {
         this.ui.updateHUD(this.viewer.fps, venue.bounds.dimensions);
       }
@@ -181,12 +186,73 @@ class App {
       this.ui.showToast('Used current 3D camera coordinates as route start.', 'success');
     });
 
-    // Start Walkthrough Tour
+    // Start Walkthrough Tour with Real-time Direction Step Highlighting
     this.ui.btnStartTour.addEventListener('click', () => {
       if (!this.activeRoute?.waypoints) return;
-      this.viewer.startWalkTour(this.activeRoute.waypoints, () => {
-        this.ui.showToast('Walkthrough tour completed!', 'success');
-      });
+      this.viewer.startWalkTour(
+        this.activeRoute.waypoints,
+        () => {
+          this.ui.showToast('Walkthrough tour completed!', 'success');
+        },
+        (currentIndex) => {
+          this.ui.highlightActiveDirectionStep(currentIndex);
+        }
+      );
+    });
+
+    // Dynamic Hazard Injection (Chemical Spill)
+    this.ui.btnInjectSpill?.addEventListener('click', async () => {
+      let obsX = 0.0;
+      let obsZ = 0.0;
+
+      // If active route exists, place hazard midway along the route!
+      if (this.activeRoute?.waypoints?.length > 2) {
+        const midIdx = Math.floor(this.activeRoute.waypoints.length / 2);
+        const midWp = this.activeRoute.waypoints[midIdx];
+        obsX = midWp.x;
+        obsZ = midWp.z;
+      } else {
+        obsX = 1.0;
+        obsZ = 0.5;
+      }
+
+      try {
+        await api.createObstacle(this.currentVenueId, {
+          name: 'Caution: Liquid Chemical Spill',
+          x: obsX,
+          z: obsZ,
+          radius: 1.1
+        });
+
+        const obstacles = await api.listObstacles(this.currentVenueId);
+        this.viewer.renderObstacles(obstacles);
+        this.ui.updateObstacleBadge(obstacles.length);
+
+        this.ui.showToast('⚠️ Dynamic hazard placed! A* path recalculating...', 'info');
+
+        // Automatically recalculate current route if start and goal selected
+        if (this.ui.navStartSelect.value && this.ui.navGoalSelect.value) {
+          await this._triggerRoute();
+        }
+      } catch (err) {
+        this.ui.showToast(`Failed to inject hazard: ${err.message}`, 'error');
+      }
+    });
+
+    // Clear Hazards
+    this.ui.btnClearHazards?.addEventListener('click', async () => {
+      try {
+        await api.clearObstacles(this.currentVenueId);
+        this.viewer.renderObstacles([]);
+        this.ui.updateObstacleBadge(0);
+        this.ui.showToast('Cleared all dynamic hazards. Path restored to optimal.', 'success');
+
+        if (this.ui.navStartSelect.value && this.ui.navGoalSelect.value) {
+          await this._triggerRoute();
+        }
+      } catch (err) {
+        this.ui.showToast(`Failed to clear hazards: ${err.message}`, 'error');
+      }
     });
 
     // Clear Route

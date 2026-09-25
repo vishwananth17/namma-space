@@ -229,6 +229,12 @@
             </div>
           </div>
 
+          <!-- Dynamic Obstacle Reroute Alert -->
+          <div id="route-reroute-alert" class="route-reroute-alert hidden">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-text" id="route-reroute-text">Path diverted around dynamic hazard.</span>
+          </div>
+
           <!-- Interactive Tour / Walkthrough Controls -->
           <div class="route-tour-controls">
             <button class="btn-tour" id="btn-start-tour">
@@ -242,12 +248,39 @@
             </button>
           </div>
 
+          <!-- Turn-by-Turn Natural Directions -->
+          <div class="directions-container">
+            <div class="directions-header">
+              <span>Turn-by-Turn Directions</span>
+              <span class="directions-count" id="directions-count">0 steps</span>
+            </div>
+            <div class="directions-list" id="directions-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
           <!-- Waypoints Timeline -->
           <div class="waypoints-list-container">
             <div class="waypoints-header">Waypoint Trajectory</div>
             <div class="waypoints-list" id="waypoints-list">
               <!-- Dynamically populated -->
             </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Obstacle Simulation Section -->
+        <div class="obstacles-section">
+          <div class="section-subheading-row">
+            <span class="section-subheading">Dynamic Hazard Simulation</span>
+            <span class="obstacle-count-badge" id="obstacle-count-badge">0 Active</span>
+          </div>
+          <div class="obstacle-btn-row">
+            <button class="btn-hazard" id="btn-inject-spill" title="Simulate a chemical/water spill obstacle on the floor">
+              <span>⚠️ Drop Hazard Spill</span>
+            </button>
+            <button class="btn-hazard-clear" id="btn-clear-hazards" title="Clear all active dynamic obstacles">
+              Clear
+            </button>
           </div>
         </div>
 

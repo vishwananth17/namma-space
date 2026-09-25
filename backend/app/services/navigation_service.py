@@ -6,6 +6,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from app.algorithms.astar import AStarPathfinder, NoPathFoundError, NoWalkableCellError
+from app.algorithms.directions import generate_natural_directions
 from app.algorithms.mesh_slicer import generate_occupancy_grid_from_mesh
 from app.algorithms.occupancy_grid import (
     OccupancyGrid,
@@ -17,6 +18,9 @@ from app.algorithms.path_smoothing import smooth_path
 from app.config import settings
 from app.models.common import Point3D
 from app.models.navigation import (
+    DirectionStep,
+    DynamicObstacle,
+    DynamicObstacleCreate,
     NavMeshDebugInfo,
     NavigationRequest,
     NavigationResponse,
@@ -31,6 +35,49 @@ class NavigationService:
 
     def __init__(self):
         self._grids: Dict[str, OccupancyGrid] = {}
+        self._dynamic_obstacles: Dict[str, Dict[str, DynamicObstacle]] = {}
+
+    def add_dynamic_obstacle(
+        self, venue_id: str, obstacle_in: DynamicObstacleCreate
+    ) -> DynamicObstacle:
+        venue_service.get_venue(venue_id)
+        obs_id = obstacle_in.id or f"obs_{int(time.time() * 1000) % 1000000}"
+        obs = DynamicObstacle(
+            id=obs_id,
+            venue_id=venue_id,
+            name=obstacle_in.name,
+            x=obstacle_in.x,
+            z=obstacle_in.z,
+            radius=obstacle_in.radius,
+            created_at=time.time(),
+            active=True,
+        )
+        if venue_id not in self._dynamic_obstacles:
+            self._dynamic_obstacles[venue_id] = {}
+        self._dynamic_obstacles[venue_id][obs_id] = obs
+        logger.info(
+            f"Registered dynamic obstacle '{obs.name}' (ID: {obs_id}) in '{venue_id}' at ({obs.x}, {obs.z})"
+        )
+        return obs
+
+    def get_dynamic_obstacles(self, venue_id: str) -> List[DynamicObstacle]:
+        venue_service.get_venue(venue_id)
+        return list(self._dynamic_obstacles.get(venue_id, {}).values())
+
+    def remove_dynamic_obstacle(self, venue_id: str, obstacle_id: str) -> bool:
+        venue_service.get_venue(venue_id)
+        if venue_id in self._dynamic_obstacles and obstacle_id in self._dynamic_obstacles[venue_id]:
+            del self._dynamic_obstacles[venue_id][obstacle_id]
+            logger.info(f"Removed dynamic obstacle {obstacle_id} from venue {venue_id}.")
+            return True
+        return False
+
+    def clear_dynamic_obstacles(self, venue_id: str) -> int:
+        venue_service.get_venue(venue_id)
+        count = len(self._dynamic_obstacles.get(venue_id, {}))
+        self._dynamic_obstacles[venue_id] = {}
+        logger.info(f"Cleared {count} dynamic obstacles from venue {venue_id}.")
+        return count
 
     def get_or_build_grid(self, venue_id: str, force_rebuild: bool = False) -> OccupancyGrid:
         """Fetch cached occupancy grid from memory or disk, or generate from 3D model."""
@@ -121,8 +168,17 @@ class NavigationService:
             db, venue_id, request.goal, request.to_poi_id, request.to_position
         )
 
-        # 2. Get occupancy grid
-        grid = self.get_or_build_grid(venue_id)
+        # 2. Get occupancy grid & apply active dynamic obstacles
+        base_grid = self.get_or_build_grid(venue_id)
+        active_obstacles = [
+            obs for obs in self._dynamic_obstacles.get(venue_id, {}).values() if obs.active
+        ]
+        if active_obstacles:
+            grid = base_grid.clone()
+            for obs in active_obstacles:
+                grid.apply_circular_obstacle(obs.x, obs.z, obs.radius)
+        else:
+            grid = base_grid
 
         # 3. Execute A* pathfinding
         pathfinder = AStarPathfinder(grid)
@@ -173,6 +229,26 @@ class NavigationService:
         walking_time = round(total_dist / 1.2, 1)  # 1.2 m/s standard indoor speed
         elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
 
+        # 7. Check avoided obstacles
+        rerouted = False
+        avoided_obstacles: List[str] = []
+        if active_obstacles:
+            for obs in active_obstacles:
+                for wp in waypoints_3d:
+                    if math.hypot(wp.x - obs.x, wp.z - obs.z) <= obs.radius + 1.2:
+                        rerouted = True
+                        if obs.name not in avoided_obstacles:
+                            avoided_obstacles.append(obs.name)
+
+        # 8. Synthesize turn-by-turn natural language directions
+        all_pois = poi_service.list_pois(db, venue_id)
+        directions = generate_natural_directions(
+            waypoints=waypoints_3d,
+            origin_name=origin_name,
+            destination_name=goal_name,
+            venue_pois=all_pois,
+        )
+
         return NavigationResponse(
             venue_id=venue_id,
             origin_name=origin_name,
@@ -185,6 +261,9 @@ class NavigationService:
             estimated_walking_time_seconds=walking_time,
             execution_time_ms=elapsed_ms,
             path_smoothed=path_smoothed,
+            directions=directions,
+            rerouted_due_to_obstacles=rerouted,
+            avoided_obstacles=avoided_obstacles,
         )
 
     def get_debug_info(self, venue_id: str) -> NavMeshDebugInfo:
@@ -195,6 +274,7 @@ class NavigationService:
         inflated_cnt = int(np.sum(grid.data == STATE_INFLATED))
         total_valid = walkable_cnt + obstacle_cnt + inflated_cnt
         pct = round((walkable_cnt / total_valid * 100.0), 1) if total_valid > 0 else 0.0
+        active_cnt = len(self._dynamic_obstacles.get(venue_id, {}))
 
         return NavMeshDebugInfo(
             venue_id=venue_id,
@@ -206,6 +286,7 @@ class NavigationService:
             inflated_cells_count=inflated_cnt,
             walkable_percentage=pct,
             debug_map_url=f"/venues/{venue_id}/navmesh/debug.png",
+            active_dynamic_obstacles_count=active_cnt,
         )
 
     def get_debug_image_path(self, venue_id: str) -> Path:

@@ -182,3 +182,88 @@ def test_navigation_performance_benchmark(client):
     # HTTP roundtrip time
     header_ms = float(response.headers["x-process-time-ms"])
     assert header_ms < 200.0
+
+
+def test_navigation_turn_by_turn_directions(client):
+    """Pathfinding response must synthesize human-readable turn-by-turn directions."""
+    payload = {
+        "start": "workstation-alpha",
+        "goal": "coffee-station",
+        "smooth_path": True,
+    }
+    response = client.post("/venues/sample_lab/navigate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "directions" in data
+    directions = data["directions"]
+    assert len(directions) >= 2
+
+    # First step is departure
+    step1 = directions[0]
+    assert step1["step"] == 1
+    assert step1["action"] == "START"
+    assert "Depart from" in step1["instruction"]
+    assert step1["distance_meters"] > 0.0
+    assert 0 <= step1["compass_bearing_deg"] <= 359
+    assert step1["cardinal_direction"] in ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+    # Final step is arrival
+    step_last = directions[-1]
+    assert step_last["action"] == "ARRIVE"
+    assert "Arrive at" in step_last["instruction"]
+
+
+def test_dynamic_obstacles_crud_and_rerouting(client):
+    """Dynamic obstacles are registered, avoid collision via A* rerouting, and can be cleared."""
+    # 1. Clear any prior obstacles
+    res_clear = client.post("/venues/sample_lab/obstacles/clear")
+    assert res_clear.status_code == 200
+
+    # 2. Get baseline path without obstacles
+    nav_payload = {
+        "start": "workstation-alpha",
+        "goal": "coffee-station",
+        "smooth_path": True,
+    }
+    res_base = client.post("/venues/sample_lab/navigate", json=nav_payload)
+    assert res_base.status_code == 200
+    base_data = res_base.json()
+    base_dist = base_data["total_distance_meters"]
+
+    # Pick a point along the initial path to block
+    midpoint = base_data["waypoints"][len(base_data["waypoints"]) // 2]
+
+    # 3. Register a dynamic obstacle at midpoint
+    obs_payload = {
+        "id": "test_spill_hazard",
+        "name": "Hazardous Chemical Spill",
+        "x": midpoint["x"],
+        "z": midpoint["z"],
+        "radius": 1.0,
+    }
+    res_create = client.post("/venues/sample_lab/obstacles", json=obs_payload)
+    assert res_create.status_code == 201
+    created_obs = res_create.json()
+    assert created_obs["id"] == "test_spill_hazard"
+    assert created_obs["name"] == "Hazardous Chemical Spill"
+
+    # 4. List obstacles
+    res_list = client.get("/venues/sample_lab/obstacles")
+    assert res_list.status_code == 200
+    obs_list = res_list.json()
+    assert any(o["id"] == "test_spill_hazard" for o in obs_list)
+
+    # 5. Navigate again - path must successfully route around obstacle
+    res_rerouted = client.post("/venues/sample_lab/navigate", json=nav_payload)
+    assert res_rerouted.status_code == 200
+    rerouted_data = res_rerouted.json()
+    assert rerouted_data["rerouted_due_to_obstacles"] is True
+    assert "Hazardous Chemical Spill" in rerouted_data["avoided_obstacles"]
+
+    # 6. Delete obstacle and verify it is gone
+    res_del = client.delete("/venues/sample_lab/obstacles/test_spill_hazard")
+    assert res_del.status_code == 200
+    res_list_after = client.get("/venues/sample_lab/obstacles")
+    assert not any(o["id"] == "test_spill_hazard" for o in res_list_after.json())
+

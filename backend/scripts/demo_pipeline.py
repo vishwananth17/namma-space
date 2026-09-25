@@ -93,6 +93,45 @@ def run_demo():
     for idx, wp in enumerate(nav_data["waypoints"]):
         print(f"   Step {idx + 1}: ({wp['x']}, {wp['y']}, {wp['z']})")
 
+    # Turn-by-Turn Natural Directions
+    print("\n[Natural Language Turn-by-Turn Directions]")
+    for step in nav_data.get("directions", []):
+        landmark_str = f" [Landmark: {step['nearby_landmark']}]" if step.get("nearby_landmark") else ""
+        print(
+            f"   #{step['step']} [{step['action']}] {step['instruction']} "
+            f"({step['distance_meters']}m, {step['compass_bearing_deg']} deg {step['cardinal_direction']}){landmark_str}"
+        )
+
+    print_banner("5B. DYNAMIC OBSTACLE INJECTION & REAL-TIME REROUTING")
+    # Inject a temporary hazard (e.g. wet floor spill) directly into the path
+    mid_wp = nav_data["waypoints"][len(nav_data["waypoints"]) // 2]
+    obs_req = {
+        "id": "spill_hazard_01",
+        "name": "Caution: Liquid Chemical Spill",
+        "x": mid_wp["x"],
+        "z": mid_wp["z"],
+        "radius": 1.2,
+    }
+    print(f"Injecting dynamic obstacle: '{obs_req['name']}' at ({obs_req['x']}, {obs_req['z']}) [Radius = {obs_req['radius']}m]")
+    res_obs = client.post("/venues/sample_lab/obstacles", json=obs_req)
+    print(f"Obstacle registration status: HTTP {res_obs.status_code}")
+
+    # Recalculate path - A* must divert around obstacle
+    t0 = time.perf_counter()
+    res_reroute = client.post("/venues/sample_lab/navigate", json=nav_req)
+    t_ms = (time.perf_counter() - t0) * 1000.0
+    reroute_data = res_reroute.json()
+
+    print(f"Reroute status: HTTP {res_reroute.status_code} in {t_ms:.2f}ms")
+    print(f"Rerouted due to obstacles: {reroute_data.get('rerouted_due_to_obstacles')}")
+    print(f"Avoided Obstacles: {reroute_data.get('avoided_obstacles')}")
+    print(f"New Total Distance: {reroute_data['total_distance_meters']}m (Baseline: {nav_data['total_distance_meters']}m)")
+    print(f"New Waypoints Count: {reroute_data['total_waypoints']}")
+
+    # Clean up obstacle
+    client.delete("/venues/sample_lab/obstacles/spill_hazard_01")
+    print("Cleaned up dynamic obstacle: Navigation restored to baseline.")
+
     print_banner("6. ROUND 3 VENUE ONBOARDING VERIFICATION")
     res_iitb = client.get("/venues/iitb_hall")
     if res_iitb.status_code == 200:

@@ -38,6 +38,42 @@ class Waypoint3D(BaseModel):
     step_index: int
 
 
+class DirectionStep(BaseModel):
+    """Step-by-step human navigation direction with bearings and landmark cues."""
+    step: int
+    action: str = Field(
+        ...,
+        description="Navigation action: START, STRAIGHT, TURN_LEFT, TURN_RIGHT, SLIGHT_LEFT, SLIGHT_RIGHT, SHARP_LEFT, SHARP_RIGHT, ARRIVE",
+    )
+    instruction: str = Field(..., description="Human-readable turn-by-turn instruction")
+    distance_meters: float = Field(..., description="Distance in meters for this leg")
+    compass_bearing_deg: int = Field(..., description="Compass bearing (0-359 deg, 0=N, 90=E, 180=S, 270=W)")
+    cardinal_direction: str = Field(..., description="Cardinal direction: N, NE, E, SE, S, SW, W, NW")
+    nearby_landmark: Optional[str] = Field(None, description="Nearby POI landmark for contextual orientation")
+    waypoint_index: int = Field(..., description="Index in waypoints array corresponding to this instruction")
+
+
+class DynamicObstacleCreate(BaseModel):
+    """Payload to register a dynamic obstacle in the venue."""
+    id: Optional[str] = Field(None, description="Optional custom ID (e.g. 'spill_1')")
+    name: str = Field(..., description="Human-readable description (e.g. 'Wet Floor / Liquid Spill')")
+    x: float = Field(..., description="X coordinate in 3D world space (meters)")
+    z: float = Field(..., description="Z coordinate in 3D world space (meters)")
+    radius: float = Field(0.8, ge=0.1, le=10.0, description="Obstacle radius in meters")
+
+
+class DynamicObstacle(BaseModel):
+    """Active dynamic obstacle registered in a venue."""
+    id: str
+    venue_id: str
+    name: str
+    x: float
+    z: float
+    radius: float
+    created_at: float
+    active: bool = True
+
+
 class NavigationResponse(BaseModel):
     """Complete navigation route payload for Three.js path rendering."""
     venue_id: str
@@ -51,6 +87,18 @@ class NavigationResponse(BaseModel):
     estimated_walking_time_seconds: float
     execution_time_ms: float
     path_smoothed: bool
+    directions: List[DirectionStep] = Field(
+        default_factory=list,
+        description="Synthesized turn-by-turn natural language navigation instructions",
+    )
+    rerouted_due_to_obstacles: bool = Field(
+        False,
+        description="Whether path was automatically diverted around active dynamic obstacles",
+    )
+    avoided_obstacles: List[str] = Field(
+        default_factory=list,
+        description="Names of dynamic obstacles that were avoided along this route",
+    )
 
 
 class NavMeshDebugInfo(BaseModel):
@@ -64,3 +112,4 @@ class NavMeshDebugInfo(BaseModel):
     inflated_cells_count: int
     walkable_percentage: float
     debug_map_url: str
+    active_dynamic_obstacles_count: int = Field(0, description="Number of currently active dynamic obstacles")
